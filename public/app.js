@@ -70,8 +70,12 @@
     el('authScreen').classList.add('hidden');
     el('app').classList.remove('hidden');
     el('meName').textContent = state.me.name + ' · @' + (state.me.username || state.me.email);
+    el('meName').style.cursor = 'pointer';
+    el('meName').title = 'Открыть мой профиль';
+    el('meName').onclick = () => { window.location.href = '/profile/@' + encodeURIComponent(state.me.username || state.me.email); };
     connectSocket();
     loadChats();
+    if (window.location.pathname === '/settings') el('privacyModal').classList.remove('hidden');
   }
 
   // ---------- Сокет ----------
