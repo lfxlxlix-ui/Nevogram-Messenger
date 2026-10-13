@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Messenger</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+  <!-- Экран входа -->
+  <div id="authScreen" class="auth-screen">
+    <div class="auth-card">
+      <div class="auth-logo">✈️</div>
+      <h1>Мессенджер</h1>
+      <p class="auth-sub">Доступ только по приглашению</p>
+      <form id="authForm">
+        <input id="codeInput" type="text" placeholder="Специальный код" autocomplete="off" required>
+        <input id="emailInput" type="email" placeholder="Почта" autocomplete="email" required>
+        <button type="submit">Войти</button>
+      </form>
+      <div id="authError" class="auth-error"></div>
+    </div>
+  </div>
+
+  <!-- Основной интерфейс -->
+  <div id="app" class="app hidden">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="me" id="meName">Я</div>
+        <div class="sidebar-actions">
+          <button id="newDirectBtn" title="Новый чат">✎</button>
+          <button id="newGroupBtn" title="Новая группа">👥</button>
+        </div>
+      </div>
+      <div id="chatList" class="chat-list"></div>
+    </aside>
+
+    <main class="chat-main">
+      <div id="emptyState" class="empty-state">Выберите чат слева</div>
+      <div id="chatView" class="chat-view hidden">
+        <div class="chat-header">
+          <div id="chatTitle" class="chat-title"></div>
+          <div id="chatSubtitle" class="chat-subtitle"></div>
+        </div>
+        <div id="messages" class="messages"></div>
+        <form id="sendForm" class="send-form">
+          <input id="messageInput" type="text" placeholder="Сообщение" autocomplete="off">
+          <button type="submit">➤</button>
+        </form>
+      </div>
+    </main>
+  </div>
+
+  <!-- Модалка: новый личный чат -->
+  <div id="directModal" class="modal hidden">
+    <div class="modal-card">
+      <h3>Написать человеку</h3>
+      <input id="directEmailInput" type="email" placeholder="Почта собеседника">
+      <div class="modal-error" id="directError"></div>
+      <div class="modal-actions">
+        <button class="btn-secondary" data-close>Отмена</button>
+        <button class="btn-primary" id="directSubmit">Начать чат</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модалка: новая группа -->
+  <div id="groupModal" class="modal hidden">
+    <div class="modal-card">
+      <h3>Новая группа</h3>
+      <input id="groupNameInput" type="text" placeholder="Название группы">
+      <input id="groupEmailsInput" type="text" placeholder="Почты участников через запятую">
+      <div class="modal-error" id="groupError"></div>
+      <div class="modal-actions">
+        <button class="btn-secondary" data-close>Отмена</button>
+        <button class="btn-primary" id="groupSubmit">Создать</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/app.js"></script>
+</body>
+            </html>
