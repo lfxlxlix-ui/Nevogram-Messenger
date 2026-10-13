@@ -17,17 +17,19 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.get('/register', (req, res) => res.sendFile(path.join(__dirname, 'public', 'register.html')));
 app.get(['/login', '/home', '/settings'], (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
-// Public profile links look like /profile/@username.
-app.get('/profile/:handle', (req, res) => {
-  const handle = String(req.params.handle || '').replace(/^@/, '').trim().toLowerCase();
-  const user = state.users.find(u => (u.username || u.email || '').toLowerCase() === handle);
+// Public profile links use numeric IDs, for example /profile/1.
+app.get('/profile/:profileId', (req, res) => {
+  const profileId = String(req.params.profileId || '').trim();
+  if (!/^\\d+$/.test(profileId)) return res.redirect('/login');
+  const user = state.users.find((u, index) => String(u.publicId || index + 1) === profileId);
   if (!user) {
     return res.status(404).type('html').send(`<!doctype html><html lang="ru"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Профиль не найден — Nevogram</title><link rel="stylesheet" href="/style.css"><body><main class="auth-screen"><section class="auth-card"><h1>Профиль не найден</h1><p class="auth-sub">Проверьте ссылку или логин пользователя.</p><a href="/login">Вернуться в Nevogram</a></section></main></body></html>`);
   }
   const esc = value => String(value || '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   const username = esc(user.username || user.email);
   const name = esc(user.name || user.username || user.email);
-  res.type('html').send(`<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0e1621"><title>${name} (@${username}) — Nevogram</title><link rel="stylesheet" href="/style.css"></head><body><main class="auth-screen"><section class="auth-card"><div class="auth-logo">✈️</div><h1>${name}</h1><p class="auth-sub">@${username}</p><p>Профиль пользователя Nevogram</p><a href="/login">Войти в Nevogram</a></section></main></body></html>`);
+  const publicId = esc(user.publicId || state.users.indexOf(user) + 1);
+  res.type('html').send(`<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0e1621"><title>${name} — Nevogram</title><link rel="stylesheet" href="/style.css"></head><body><main class="auth-screen"><section class="auth-card"><div class="auth-logo">✈️</div><h1>${name}</h1><p class="auth-sub">ID: ${publicId} · @${username}</p><p>Профиль пользователя Nevogram</p><a href="/login">Войти в Nevogram</a></section></main></body></html>`);
 });
 
 app.get('/admin', (req, res) => {
@@ -83,7 +85,7 @@ function adminMiddleware(req, res, next) {
 }
 
 function publicUser(u) {
-  return { id: u.id, username: u.username || u.email, email: u.username || u.email, name: u.name, twoFactorEnabled: Boolean(u.twoFactorHash) };
+  return { id: u.id, publicId: u.publicId || state.users.indexOf(u) + 1, username: u.username || u.email, email: u.username || u.email, name: u.name, twoFactorEnabled: Boolean(u.twoFactorHash) };
 }
 
 // ---------- Регистрация по инвайту и вход по логину/паролю ----------
@@ -114,7 +116,8 @@ app.post('/api/register', async (req, res) => {
   if (state.users.some(u => (u.username || u.email || '').toLowerCase() === username)) return res.status(409).json({ error: 'Этот логин уже занят' });
   const invite = state.invites.find(inv => !inv.used && bcrypt.compareSync(code, inv.codeHash));
   if (!invite) return res.status(401).json({ error: 'Бета-код недействителен или уже использован' });
-  const newUser = { id: nanoid(), username, email: username, passwordHash: bcrypt.hashSync(password, 12), name: username, createdAt: Date.now(), twoFactorHash: null };
+  const nextPublicId = state.users.reduce((max, u, index) => Math.max(max, Number(u.publicId) || index + 1), 0) + 1;
+  const newUser = { id: nanoid(), publicId: nextPublicId, username, email: username, passwordHash: bcrypt.hashSync(password, 12), name: username, createdAt: Date.now(), twoFactorHash: null };
   state.users.push(newUser);
   invite.used = true;
   invite.usedByUserId = newUser.id;
