@@ -20,8 +20,9 @@ async function init() {
   await pool.query(`CREATE TABLE IF NOT EXISTS nevogram_state (id integer PRIMARY KEY CHECK (id = 1), state jsonb NOT NULL, updated_at timestamptz NOT NULL DEFAULT now())`);
   const result = await pool.query('SELECT state FROM nevogram_state WHERE id = 1');
   if (result.rows.length) {
-    state = result.rows[0].state;
-    if (!state || typeof state !== 'object') state = defaultState();
+    const loaded = result.rows[0].state;
+    for (const key of Object.keys(state)) delete state[key];
+    Object.assign(state, loaded && typeof loaded === 'object' ? loaded : defaultState());
     for (const key of ['users', 'invites', 'chats', 'messages']) if (!Array.isArray(state[key])) state[key] = [];
   } else {
     await pool.query('INSERT INTO nevogram_state (id, state) VALUES (1, $1::jsonb) ON CONFLICT (id) DO NOTHING', [JSON.stringify(state)]);
