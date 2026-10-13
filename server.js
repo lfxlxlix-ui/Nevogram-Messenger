@@ -204,7 +204,8 @@ function chatPreview(chat, userId) {
     type: chat.type,
     title,
     lastMessage: last ? { text: last.text, createdAt: last.createdAt, senderId: last.senderId } : null,
-    unread
+    unread,
+    ...(chat.type === 'channel' ? { username: chat.username || null, description: chat.description || '', isPublic: Boolean(chat.isPublic), ownerId: chat.ownerId, subscriberCount: chat.memberIds.length, canPost: chat.ownerId === userId || (chat.adminIds || []).includes(userId) } : {})
   };
 }
 
@@ -285,6 +286,96 @@ app.get('/api/chats/:id/members', authMiddleware, (req, res) => {
   res.json({ members: chat.memberIds.map(id => publicUser(state.users.find(u => u.id === id))) });
 });
 
+
+/* ---------- Каналы: публичные/приватные, подписка и публикации ---------- */
+function channelUsernameTaken(username, exceptId) {
+  return state.chats.some(c => c.type === 'channel' && c.id !== exceptId && c.username === username);
+}
+function channelPublicInfo(chat, userId) {
+  return {
+    id: chat.id, title: chat.name, username: chat.username || null,
+    description: chat.description || '', isPublic: Boolean(chat.isPublic),
+    ownerId: chat.ownerId, subscriberCount: chat.memberIds.length,
+    isMember: chat.memberIds.includes(userId),
+    canPost: chat.ownerId === userId || (chat.adminIds || []).includes(userId),
+    inviteCode: chat.isPublic ? null : (chat.ownerId === userId ? chat.inviteCode : null)
+  };
+}
+app.post('/api/channels', authMiddleware, (req, res) => {
+  const body = req.body || {};
+  const name = String(body.name || '').trim().slice(0, 80);
+  const description = String(body.description || '').trim().slice(0, 500);
+  const isPublic = body.visibility !== 'private';
+  const username = String(body.username || '').trim().replace(/^@/, '').toLowerCase();
+  if (!name) return res.status(400).json({ error: 'Укажите название канала' });
+  if (isPublic && !/^[a-z0-9_]{5,32}$/.test(username)) return res.status(400).json({ error: 'Публичный @username: 5–32 символа, латиница, цифры и _' });
+  if (isPublic && channelUsernameTaken(username)) return res.status(409).json({ error: 'Этот @username уже занят' });
+  const chat = {
+    id: nanoid(), type: 'channel', name, description, username: isPublic ? username : null,
+    isPublic, inviteCode: nanoid(16), ownerId: req.user.id, adminIds: [], memberIds: [req.user.id],
+    createdAt: Date.now()
+  };
+  state.chats.push(chat); save();
+  io.in('user:' + req.user.id).socketsJoin(chat.id);
+  res.status(201).json({ channel: channelPublicInfo(chat, req.user.id), chat: chatPreview(chat, req.user.id) });
+});
+app.get('/api/channels/search', authMiddleware, (req, res) => {
+  const q = String(req.query.q || '').trim().replace(/^@/, '').toLowerCase();
+  const channels = state.chats.filter(c => c.type === 'channel' && c.isPublic &&
+    (!q || c.name.toLowerCase().includes(q) || (c.username || '').includes(q)))
+    .slice(0, 30).map(c => ({ id:c.id, title:c.name, username:c.username, description:c.description || '',
+      subscriberCount:c.memberIds.length, isMember:c.memberIds.includes(req.user.id) }));
+  res.json({ channels });
+});
+app.get('/api/channels/:id', authMiddleware, (req, res) => {
+  const chat = state.chats.find(c => c.id === req.params.id && c.type === 'channel');
+  if (!chat) return res.status(404).json({ error: 'Канал не найден' });
+  if (!chat.isPublic && !chat.memberIds.includes(req.user.id) && chat.ownerId !== req.user.id)
+    return res.status(404).json({ error: 'Приватный канал доступен только по приглашению' });
+  res.json({ channel: channelPublicInfo(chat, req.user.id), chat: chatPreview(chat, req.user.id) });
+});
+app.post('/api/channels/join', authMiddleware, (req, res) => {
+  const body = req.body || {};
+  const key = String(body.id || '');
+  const code = String(body.inviteCode || '');
+  const chat = state.chats.find(c => c.type === 'channel' && (c.id === key || c.username === String(body.username || '').replace(/^@/, '').toLowerCase()));
+  if (!chat) return res.status(404).json({ error: 'Канал не найден' });
+  if (!chat.isPublic && code !== chat.inviteCode && chat.ownerId !== req.user.id && !chat.memberIds.includes(req.user.id))
+    return res.status(403).json({ error: 'Для приватного канала нужна действующая ссылка-приглашение' });
+  if (!chat.memberIds.includes(req.user.id)) { chat.memberIds.push(req.user.id); save(); }
+  io.in('user:' + req.user.id).socketsJoin(chat.id);
+  io.to('user:' + chat.ownerId).emit('chat:new');
+  res.json({ channel: channelPublicInfo(chat, req.user.id), chat: chatPreview(chat, req.user.id) });
+});
+app.post('/api/channels/:id/leave', authMiddleware, (req, res) => {
+  const chat = state.chats.find(c => c.id === req.params.id && c.type === 'channel');
+  if (!chat) return res.status(404).json({ error: 'Канал не найден' });
+  if (chat.ownerId === req.user.id) return res.status(400).json({ error: 'Владелец не может покинуть канал — передайте владение или удалите его' });
+  chat.memberIds = chat.memberIds.filter(id => id !== req.user.id);
+  save();
+  for (const socket of io.sockets.sockets.values()) if (socket.userId === req.user.id) socket.leave(chat.id);
+  res.json({ ok: true });
+});
+app.get('/api/channels/:id/invite', authMiddleware, (req, res) => {
+  const chat = state.chats.find(c => c.id === req.params.id && c.type === 'channel');
+  if (!chat || chat.ownerId !== req.user.id) return res.status(403).json({ error: 'Только владелец может получить ссылку-приглашение' });
+  res.json({ inviteCode: chat.inviteCode, link: locationForInvite(chat) });
+});
+function locationForInvite(chat) { return chat.isPublic ? '/?channel=' + encodeURIComponent(chat.username) : '/?invite=' + encodeURIComponent(chat.id + '.' + chat.inviteCode); }
+app.patch('/api/channels/:id', authMiddleware, (req, res) => {
+  const chat = state.chats.find(c => c.id === req.params.id && c.type === 'channel');
+  if (!chat || chat.ownerId !== req.user.id) return res.status(403).json({ error: 'Только владелец может менять настройки канала' });
+  const body = req.body || {};
+  if (body.name !== undefined) {
+    const name = String(body.name || '').trim();
+    if (!name) return res.status(400).json({ error: 'Название не может быть пустым' });
+    chat.name = name.slice(0, 80);
+  }
+  if (body.description !== undefined) chat.description = String(body.description || '').trim().slice(0, 500);
+  save();
+  res.json({ channel: channelPublicInfo(chat, req.user.id) });
+});
+
 // ---------- Админка: инвайт-коды и пользователи ----------
 // Админ НЕ имеет доступа к переписке людей — только управляет кодами приглашений и видит список аккаунтов.
 app.post('/api/admin/login', (req, res) => {
@@ -351,6 +442,7 @@ io.on('connection', (socket) => {
   socket.on('message:send', ({ chatId, text }) => {
     const chat = state.chats.find(c => c.id === chatId);
     if (!chat || !chat.memberIds.includes(socket.userId)) return;
+    if (chat.type === 'channel' && chat.ownerId !== socket.userId && !(chat.adminIds || []).includes(socket.userId)) return;
     const clean = String(text || '').trim().slice(0, 4000);
     if (!clean) return;
     const msg = {
