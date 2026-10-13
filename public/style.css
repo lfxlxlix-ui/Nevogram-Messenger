@@ -220,3 +220,9 @@ html, body {
   .privacy-row { font-size:13px; }
   .privacy-row select { max-width:105px; }
 }
+
+/* Email-code sign-in */
+.register-hint { margin:14px 0 0; color:#89919d; font-size:14px; }
+.register-hint a { color:#4ca3f2; text-decoration:none; font-weight:600; }
+.auth-back-button { margin-top:10px; background:transparent !important; color:#8e9aa8 !important; border:1px solid #303b48 !important; }
+#codeEmailLabel { overflow-wrap:anywhere; color:#e8edf4; }
