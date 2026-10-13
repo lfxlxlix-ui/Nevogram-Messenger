@@ -246,3 +246,6 @@ html, body {
 
 /* Удаление чата с аккаунтом, которого больше нет */
 .chat-item{display:flex;align-items:center;gap:8px}.chat-item-content{flex:1;min-width:0;cursor:pointer}.remove-deleted-chat{flex:0 0 32px;width:32px;height:32px;border:1px solid var(--border);border-radius:50%;background:var(--panel-2);color:var(--text-dim);font-size:22px;line-height:1;cursor:pointer}.remove-deleted-chat:hover{color:#fff;background:#b83b45;border-color:#b83b45}.remove-deleted-chat:disabled{opacity:.5;cursor:wait}
+
+/* Кнопка удаления сохранённого аккаунта из списка переключения */
+.account-row{display:flex;align-items:stretch;gap:6px;margin:4px 0}.account-row .account-option{flex:1;min-width:0;margin:0}.remove-saved-account{flex:0 0 42px;border:1px solid var(--border);border-radius:10px;background:var(--panel-2);color:var(--text-dim);font-size:23px;cursor:pointer}.remove-saved-account:hover{background:#b83b45;border-color:#b83b45;color:#fff}
