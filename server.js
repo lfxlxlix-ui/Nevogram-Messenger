@@ -57,7 +57,7 @@ function adminMiddleware(req, res, next) {
 }
 
 function publicUser(u) {
-  return { id: u.id, email: u.email, name: u.name };
+  return { id: u.id, username: u.username || u.email, email: u.username || u.email, name: u.name, twoFactorEnabled: Boolean(u.twoFactorHash) };
 }
 
 // ---------- Регистрация по инвайту и вход по логину/паролю ----------
