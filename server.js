@@ -226,6 +226,9 @@ app.post('/api/chats/direct', authMiddleware, (req, res) => {
     chat = { id: nanoid(), type: 'direct', name: null, memberIds: [req.user.id, other.id], createdAt: Date.now() };
     state.chats.push(chat);
     save();
+    // Notify both participants so the new chat appears without refreshing.
+    io.to('user:' + req.user.id).emit('chat:new');
+    io.to('user:' + other.id).emit('chat:new');
   }
   res.json({ chat: chatPreview(chat, req.user.id) });
 });
@@ -321,6 +324,7 @@ io.use((socket, next) => {
 io.on('connection', (socket) => {
   if (!onlineUsers.has(socket.userId)) onlineUsers.set(socket.userId, new Set());
   onlineUsers.get(socket.userId).add(socket.id);
+  socket.join('user:' + socket.userId);
 
   const myChats = state.chats.filter(c => c.memberIds.includes(socket.userId));
   myChats.forEach(c => socket.join(c.id));
