@@ -110,6 +110,7 @@
     connectSocket();
     loadChats();
     setupNavigation();
+    handleChannelDeepLink();
     if (window.location.pathname === '/settings') { loadPrivacySettings(); el('privacyModal').classList.remove('hidden'); }
   }
 
@@ -172,7 +173,7 @@
     el('moreOpenBtn').onclick=()=>{renderAccountList();el('moreModal').classList.remove('hidden')};
     el('newChatFab').onclick=()=>{el('createMenuError').textContent='';el('createMenuModal').classList.remove('hidden');el('peopleSearchInput').focus()};
     el('newGroupMenuBtn').onclick=()=>{el('createMenuModal').classList.add('hidden');el('groupModal').classList.remove('hidden')};
-    el('newChannelMenuBtn').onclick=()=>{el('createMenuError').textContent='Создание каналов ещё не подключено — добавим следующим этапом.'};
+    el('newChannelMenuBtn').onclick=()=>{el('createMenuModal').classList.add('hidden');el('channelModal').classList.remove('hidden');el('channelError').textContent='';};
     el('switchAccountBtn').onclick=renderAccountList;
     el('markAllReadBtn').onclick=async()=>{try{for(const c of state.chats)await api('/chats/'+c.id+'/read',{method:'POST'});await loadChats();el('moreModal').classList.add('hidden')}catch(e){alert(e.message)}};
     el('muteHourBtn').onclick=()=>{state.mutedUntil=Date.now()+3600000;localStorage.setItem('nevogramMutedUntil',String(state.mutedUntil));el('muteHourBtn').textContent='✓ Звук отключён на час'};
@@ -192,6 +193,7 @@
   async function loadChats() {
     const data = await api('/chats');
     state.chats = data.chats;
+    if (state.activeChat) { const fresh = state.chats.find(c => c.id === state.activeChat.id); if (fresh) state.activeChat = { ...state.activeChat, ...fresh }; }
     renderChatList();
   }
 
@@ -205,7 +207,7 @@
       const preview = chat.lastMessage ? escapeHtml(chat.lastMessage.text) : 'Нет сообщений';
       item.innerHTML = `
         <div class="chat-item-top">
-          <div class="chat-item-title">${escapeHtml(chat.title)}</div>
+          <div class="chat-item-title">${chat.type === 'channel' ? '📢 ' : ''}${escapeHtml(chat.title)}</div>
           <div class="chat-item-time">${time}</div>
         </div>
         <div class="chat-item-bottom">
@@ -226,12 +228,15 @@
     el('emptyState').classList.add('hidden');
     el('chatView').classList.remove('hidden');
     el('chatTitle').textContent = data.chat.title;
-    el('chatSubtitle').textContent = '';
+    el('chatSubtitle').textContent = data.chat.type === 'channel' ? ((data.chat.username ? '@'+data.chat.username+' · ' : '') + (data.chat.subscriberCount || 1) + ' подписчиков') : '';
+    el('messageInput').disabled = data.chat.type === 'channel' && !data.chat.canPost;
+    el('messageInput').placeholder = data.chat.type === 'channel' && !data.chat.canPost ? 'Публиковать могут только администраторы' : 'Сообщение';
     el('messages').innerHTML = '';
+    if (data.chat.type === 'channel') { const info = document.createElement('div'); info.className='channel-info'; info.innerHTML='<strong>'+escapeHtml(data.chat.title)+'</strong><p>'+escapeHtml(data.chat.description||'Канал Nevogram')+'</p>'; el('messages').appendChild(info); }
     data.messages.forEach(renderMessage);
     scrollMessagesToBottom();
     renderChatList();
-    state.socket.emit('read', { chatId });
+    if (data.chat.type !== 'channel') state.socket.emit('read', { chatId });
   }
 
   function renderMessage(msg) {
@@ -256,6 +261,7 @@
     const text = input.value.trim();
     if (!text) return;
     if (!state.activeChat) return;
+    if (state.activeChat.type === 'channel' && !state.activeChat.canPost) return;
     state.socket.emit('message:send', { chatId: state.activeChat.id, text });
     input.value = '';
   });
@@ -267,6 +273,53 @@
     state.socket.emit('typing', { chatId: state.activeChat.id });
     typingTimer = setTimeout(() => { typingTimer = null; }, 1500);
   });
+
+
+  async function handleChannelDeepLink() {
+    const params = new URLSearchParams(location.search);
+    const username = params.get('channel');
+    const invite = params.get('invite');
+    if (!username && !invite) return;
+    try {
+      const body = username ? { username } : { id: invite.split('.')[0], inviteCode: invite.split('.').slice(1).join('.') };
+      const d = await api('/channels/join', { method: 'POST', body });
+      history.replaceState({}, '', '/home');
+      await loadChats(); openChat(d.chat.id);
+    } catch (e) { alert(e.message); }
+  }
+  // ---------- Каналы ----------
+  el('channelSubmit').addEventListener('click', async () => {
+    el('channelError').textContent = '';
+    try {
+      const visibility = el('channelVisibility').value;
+      const body = { name: el('channelNameInput').value.trim(), description: el('channelDescriptionInput').value.trim(), visibility, username: el('channelUsernameInput').value.trim() };
+      const d = await api('/channels', { method: 'POST', body });
+      el('channelModal').classList.add('hidden');
+      ['channelNameInput','channelDescriptionInput','channelUsernameInput'].forEach(id => el(id).value='');
+      await loadChats(); openChat(d.chat.id);
+      if (!d.channel.isPublic) {
+        const invite = await api('/channels/'+d.chat.id+'/invite');
+        alert('Ссылка-приглашение: '+location.origin+invite.link);
+      }
+    } catch(e) { el('channelError').textContent = e.message; }
+  });
+  el('channelVisibility').addEventListener('change', () => {
+    el('channelUsernameWrap').classList.toggle('hidden', el('channelVisibility').value !== 'public');
+  });
+  async function searchChannels(inputId, resultsId) {
+    const q=el(inputId).value.trim(), box=el(resultsId);
+    if (!q) return;
+    try {
+      const d=await api('/channels/search?q='+encodeURIComponent(q));
+      const html=d.channels.map(c=>'<button class="search-result" data-channel="'+escapeHtml(c.id)+'"><strong>📢 '+escapeHtml(c.title)+'</strong><small>@'+escapeHtml(c.username)+' · '+c.subscriberCount+' подписчиков</small><small>'+escapeHtml(c.description||'')+'</small><small>'+(c.isMember?'Вы подписаны':'Нажмите, чтобы подписаться')+'</small></button>').join('');
+      box.innerHTML=html || '<p class="search-empty">Каналы не найдены</p>';
+      box.querySelectorAll('[data-channel]').forEach(b=>b.onclick=async()=>{
+        try { const d=await api('/channels/join',{method:'POST',body:{id:b.dataset.channel}}); el('globalSearchModal').classList.add('hidden'); await loadChats(); openChat(d.chat.id); }
+        catch(e){box.insertAdjacentHTML('beforeend','<p class="search-empty">'+escapeHtml(e.message)+'</p>');}
+      });
+    } catch(e) { box.textContent=e.message; }
+  }
+  el('globalSearchInput').addEventListener('input', () => searchChannels('globalSearchInput','globalSearchResults'));
 
   // ---------- Новый личный чат ----------
   el('newDirectBtn').addEventListener('click', () => el('directModal').classList.remove('hidden'));
