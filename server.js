@@ -15,7 +15,8 @@ const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/register', (req, res) => res.sendFile(path.join(__dirname, 'public', 'register.html')));
-app.get(['/login', '/home', '/settings'], (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));\n
+app.get(['/login', '/home', '/settings'], (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+
 app.get('/cp', (req, res) => {
   res.type('html').send(`<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Настройка профиля — Nevogram</title><link rel="stylesheet" href="/style.css"><style>
 .cp-avatar{width:124px;height:124px;border-radius:50%;background:#202b38;border:2px solid #344457;color:#d9e5f2;font-size:42px;display:flex;align-items:center;justify-content:center;margin:0 auto 10px;cursor:pointer;overflow:hidden}.cp-avatar img{width:100%;height:100%;object-fit:cover}.cp-hint{text-align:center;color:#9eafc2;font-size:14px;margin-bottom:22px}.cp-label{display:block;text-align:left;margin:12px 0 6px;color:#d9e5f2}
@@ -161,7 +162,22 @@ app.get('/api/me', authMiddleware, (req, res) => {
   res.json({ user: publicUser(req.user) });
 });
 
-app.put('/api/me/profile', authMiddleware, (req, res) => {\n  const firstName = String((req.body || {}).firstName || '').trim();\n  const lastName = String((req.body || {}).lastName || '').trim();\n  const avatar = String((req.body || {}).avatar || '');\n  if (!firstName) return res.status(400).json({ error: 'Введите имя' });\n  if (firstName.length > 40 || lastName.length > 40) return res.status(400).json({ error: 'Имя и фамилия должны быть не длиннее 40 символов' });\n  if (avatar && (!avatar.startsWith('data:image/jpeg;base64,') || avatar.length > 1500000)) return res.status(400).json({ error: 'Фото не подходит или слишком большое' });\n  req.user.firstName = firstName;\n  req.user.lastName = lastName;\n  req.user.name = [firstName, lastName].filter(Boolean).join(' ');\n  if (avatar) req.user.avatar = avatar;\n  save();\n  res.json({ ok: true, user: publicUser(req.user) });\n});\n\napp.patch('/api/me', authMiddleware, (req, res) => {
+app.put('/api/me/profile', authMiddleware, (req, res) => {
+  const firstName = String((req.body || {}).firstName || '').trim();
+  const lastName = String((req.body || {}).lastName || '').trim();
+  const avatar = String((req.body || {}).avatar || '');
+  if (!firstName) return res.status(400).json({ error: 'Введите имя' });
+  if (firstName.length > 40 || lastName.length > 40) return res.status(400).json({ error: 'Имя и фамилия должны быть не длиннее 40 символов' });
+  if (avatar && (!avatar.startsWith('data:image/jpeg;base64,') || avatar.length > 1500000)) return res.status(400).json({ error: 'Фото не подходит или слишком большое' });
+  req.user.firstName = firstName;
+  req.user.lastName = lastName;
+  req.user.name = [firstName, lastName].filter(Boolean).join(' ');
+  if (avatar) req.user.avatar = avatar;
+  save();
+  res.json({ ok: true, user: publicUser(req.user) });
+});
+
+app.patch('/api/me', authMiddleware, (req, res) => {
   const { name } = req.body || {};
   if (name && String(name).trim()) {
     req.user.name = String(name).trim().slice(0, 50);
@@ -266,7 +282,16 @@ app.post('/api/admin/invites', adminMiddleware, (req, res) => {
   res.json({ code: rawCode, id: invite.id }); // код показывается только один раз
 });
 
-app.delete('/api/admin/invites/:id', adminMiddleware, (req, res) => {\n  const index = state.invites.findIndex(inv => inv.id === req.params.id);\n  if (index < 0) return res.status(404).json({ error: 'Приглашение не найдено' });\n  if (state.invites[index].used) return res.status(409).json({ error: 'Использованный код удалить нельзя' });\n  state.invites.splice(index, 1);\n  save();\n  res.json({ ok: true });\n});\n\napp.get('/api/admin/invites', adminMiddleware, (req, res) => {
+app.delete('/api/admin/invites/:id', adminMiddleware, (req, res) => {
+  const index = state.invites.findIndex(inv => inv.id === req.params.id);
+  if (index < 0) return res.status(404).json({ error: 'Приглашение не найдено' });
+  if (state.invites[index].used) return res.status(409).json({ error: 'Использованный код удалить нельзя' });
+  state.invites.splice(index, 1);
+  save();
+  res.json({ ok: true });
+});
+
+app.get('/api/admin/invites', adminMiddleware, (req, res) => {
   const list = state.invites.map(inv => ({
     id: inv.id,
     codePreview: inv.codePreview,
