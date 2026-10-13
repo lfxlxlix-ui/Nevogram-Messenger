@@ -241,3 +241,5 @@ html, body {
 .account-picker-info small { color:var(--text-dim); }
 .account-picker-arrow { font-size:25px; color:var(--text-dim); }
 .account-picker-other { width:100%; margin-top:8px; padding:11px; border:1px solid #344353; border-radius:10px; background:transparent; color:var(--accent); cursor:pointer; }
+
+.channel-label{display:flex;flex-direction:column;gap:8px;color:var(--text-dim);font-size:13px}.channel-label select{width:100%;padding:12px;border-radius:10px;border:1px solid var(--border);background:var(--panel-2);color:var(--text)}.channel-info{align-self:center;max-width:420px;text-align:center;padding:18px 22px;margin:18px;border-radius:16px;background:var(--panel);color:var(--text-dim);font-size:13px}.channel-info strong{color:var(--text);font-size:17px}.channel-info p{margin:8px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}#messageInput:disabled{opacity:.7;cursor:not-allowed}
