@@ -257,7 +257,7 @@
     box.scrollTop = box.scrollHeight;
   }
 
-  el('sendForm').addEventListener('submit', (e) => {
+  el('sendForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const input = el('messageInput');
     const text = input.value.trim();
