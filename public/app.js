@@ -205,16 +205,39 @@
       item.className = 'chat-item' + (state.activeChat && state.activeChat.id === chat.id ? ' active' : '');
       const time = chat.lastMessage ? formatTime(chat.lastMessage.createdAt) : '';
       const preview = chat.lastMessage ? escapeHtml(chat.lastMessage.text) : 'Нет сообщений';
+      const isDeletedAccount = chat.type === 'direct' && chat.title === 'Удалённый пользователь';
       item.innerHTML = `
-        <div class="chat-item-top">
-          <div class="chat-item-title">${chat.type === 'channel' ? '📢 ' : ''}${escapeHtml(chat.title)}</div>
-          <div class="chat-item-time">${time}</div>
+        <div class="chat-item-content">
+          <div class="chat-item-top">
+            <div class="chat-item-title">${chat.type === 'channel' ? '📢 ' : ''}${escapeHtml(chat.title)}</div>
+            <div class="chat-item-time">${time}</div>
+          </div>
+          <div class="chat-item-bottom">
+            <div class="chat-item-preview">${preview}</div>
+            ${chat.unread ? `<div class="chat-item-badge">${chat.unread}</div>` : ''}
+          </div>
         </div>
-        <div class="chat-item-bottom">
-          <div class="chat-item-preview">${preview}</div>
-          ${chat.unread ? `<div class="chat-item-badge">${chat.unread}</div>` : ''}
-        </div>`;
+        ${isDeletedAccount ? '<button type="button" class="remove-deleted-chat" aria-label="Убрать удалённый аккаунт из списка" title="Убрать из списка">×</button>' : ''}`;
       item.addEventListener('click', () => openChat(chat.id));
+      const removeButton = item.querySelector('.remove-deleted-chat');
+      if (removeButton) removeButton.addEventListener('click', async (event) => {
+        event.stopPropagation();
+        if (!confirm('Убрать удалённый аккаунт из списка чатов?')) return;
+        removeButton.disabled = true;
+        try {
+          await api('/chats/' + encodeURIComponent(chat.id), { method: 'DELETE' });
+          if (state.activeChat && state.activeChat.id === chat.id) {
+            state.activeChat = null;
+            el('chatView').classList.add('hidden');
+            el('emptyState').classList.remove('hidden');
+            document.getElementById('app').classList.remove('chat-open');
+          }
+          await loadChats();
+        } catch (error) {
+          alert(error.message);
+          removeButton.disabled = false;
+        }
+      });
       list.appendChild(item);
     });
   }
