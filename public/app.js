@@ -255,6 +255,18 @@
     btn.addEventListener('click', () => btn.closest('.modal').classList.add('hidden'));
   });
 
+  // Закрытие любого меню: крестик/кнопка «Закрыть», нажатие снаружи или Escape.
+  document.querySelectorAll('.modal').forEach(modal => {
+    modal.addEventListener('click', event => {
+      if (event.target === modal) modal.classList.add('hidden');
+    });
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') {
+      document.querySelectorAll('.modal:not(.hidden)').forEach(modal => modal.classList.add('hidden'));
+    }
+  });
+
 
   // ---------- Настройки двухфакторной защиты ----------
   el('securitySaveBtn').addEventListener('click', async () => {
