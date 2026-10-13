@@ -210,7 +210,29 @@
     btn.addEventListener('click', () => btn.closest('.modal').classList.add('hidden'));
   });
 
-  // ---------- Утилиты ----------
+
+  // ---------- Конфиденциальность ----------
+  const privacyDefaults = { email: 'Все', online: 'Все', avatar: 'Все', messages: 'Все', groups: 'Все', channels: 'Все', username: 'Все' };
+  function loadPrivacySettings() {
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem('nevogramPrivacy') || '{}'); } catch (_) {}
+    document.querySelectorAll('[data-privacy]').forEach(select => {
+      const key = select.dataset.privacy;
+      select.value = saved[key] || privacyDefaults[key] || 'Все';
+    });
+  }
+  function savePrivacySettings() {
+    const saved = {};
+    document.querySelectorAll('[data-privacy]').forEach(select => { saved[select.dataset.privacy] = select.value; });
+    localStorage.setItem('nevogramPrivacy', JSON.stringify(saved));
+    el('privacyModal').classList.add('hidden');
+  }
+  el('privacyOpenBtn').addEventListener('click', () => {
+    loadPrivacySettings();
+    el('privacyModal').classList.remove('hidden');
+  });
+  el('privacySaveBtn').addEventListener('click', savePrivacySettings);
+\n  // ---------- Утилиты ----------
   function formatTime(ts) {
     const d = new Date(ts);
     return d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
