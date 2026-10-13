@@ -1,5 +1,5 @@
 {
-  "name": "my-messenger",
+  "name": "Nevogram",
   "version": "1.0.0",
   "description": "Приватный мессенджер для компании (вход по инвайт-коду)",
   "main": "server.js",
