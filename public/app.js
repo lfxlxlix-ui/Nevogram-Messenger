@@ -4,7 +4,8 @@
     me: null,
     chats: [],
     activeChat: null,
-    socket: null
+    socket: null,
+    mutedUntil: Number(localStorage.getItem('nevogramMutedUntil') || 0)
   };
 
   const el = (id) => document.getElementById(id);
@@ -67,6 +68,7 @@
   }
 
   function startApp() {
+    rememberAccount();
     el('authScreen').classList.add('hidden');
     el('app').classList.remove('hidden');
     el('meName').textContent = state.me.name + ' · @' + (state.me.username || state.me.email);
@@ -75,7 +77,8 @@
     el('meName').onclick = () => { window.location.href = '/profile/' + encodeURIComponent(state.me.publicId || 1); };
     connectSocket();
     loadChats();
-    if (window.location.pathname === '/settings') el('privacyModal').classList.remove('hidden');
+    setupNavigation();
+    if (window.location.pathname === '/settings') { loadPrivacySettings(); el('privacyModal').classList.remove('hidden'); }
   }
 
   // ---------- Сокет ----------
@@ -108,6 +111,34 @@
         window.__typingTimeout = setTimeout(() => { el('chatSubtitle').textContent = ''; }, 2000);
       }
     });
+  }
+
+  function rememberAccount() {
+    let accounts=[]; try{accounts=JSON.parse(localStorage.getItem('nevogramAccounts')||'[]')}catch(_){}
+    if(!Array.isArray(accounts))accounts=[];
+    const a={token:state.token,id:state.me.id,username:state.me.username||state.me.email,name:state.me.name||state.me.username};
+    accounts=accounts.filter(x=>x.id!==a.id);accounts.unshift(a);localStorage.setItem('nevogramAccounts',JSON.stringify(accounts.slice(0,3)));
+  }
+  function setupNavigation(){
+    document.querySelectorAll('[data-nav]').forEach(a=>a.classList.toggle('active',a.dataset.nav===(location.pathname==='/settings'?'settings':'home')));
+    el('myProfileNav').onclick=e=>{e.preventDefault();location.href='/profile/'+encodeURIComponent(state.me.publicId||1)};
+    el('searchOpenBtn').onclick=()=>{el('globalSearchModal').classList.remove('hidden');el('globalSearchInput').focus()};
+    el('moreOpenBtn').onclick=()=>{renderAccountList();el('moreModal').classList.remove('hidden')};
+    el('newChatFab').onclick=()=>{el('createMenuError').textContent='';el('createMenuModal').classList.remove('hidden');el('peopleSearchInput').focus()};
+    el('newGroupMenuBtn').onclick=()=>{el('createMenuModal').classList.add('hidden');el('groupModal').classList.remove('hidden')};
+    el('newChannelMenuBtn').onclick=()=>{el('createMenuError').textContent='Создание каналов ещё не подключено — добавим следующим этапом.'};
+    el('switchAccountBtn').onclick=renderAccountList;
+    el('markAllReadBtn').onclick=async()=>{try{for(const c of state.chats)await api('/chats/'+c.id+'/read',{method:'POST'});await loadChats();el('moreModal').classList.add('hidden')}catch(e){alert(e.message)}};
+    el('muteHourBtn').onclick=()=>{state.mutedUntil=Date.now()+3600000;localStorage.setItem('nevogramMutedUntil',String(state.mutedUntil));el('muteHourBtn').textContent='✓ Звук отключён на час'};
+    const search=async(inputId,resultsId)=>{const q=el(inputId).value.trim(),box=el(resultsId);if(!q){box.innerHTML='';return}try{const d=await api('/search/users?q='+encodeURIComponent(q));box.innerHTML=d.users.map(u=>'<button class="search-result" data-user="'+escapeHtml(u.username)+'"><strong>'+escapeHtml(u.name||u.username)+'</strong><small>@'+escapeHtml(u.username)+'</small></button>').join('')||'<p class="search-empty">Ничего не найдено</p>';box.querySelectorAll('[data-user]').forEach(b=>b.onclick=async()=>{try{const d=await api('/chats/direct',{method:'POST',body:{email:b.dataset.user}});el('globalSearchModal').classList.add('hidden');el('createMenuModal').classList.add('hidden');await loadChats();openChat(d.chat.id)}catch(e){alert(e.message)}})}catch(e){box.textContent=e.message}};
+    el('globalSearchInput').oninput=()=>search('globalSearchInput','globalSearchResults');
+    el('peopleSearchInput').oninput=()=>search('peopleSearchInput','peopleSearchResults');
+  }
+  function renderAccountList(){
+    let accounts=[];try{accounts=JSON.parse(localStorage.getItem('nevogramAccounts')||'[]')}catch(_){}
+    if(!Array.isArray(accounts))accounts=[];
+    const box=el('accountList');box.innerHTML='<p class="account-heading">Аккаунты ('+accounts.length+'/3)</p>'+accounts.map(a=>'<button class="account-option" data-account="'+escapeHtml(a.id)+'">'+escapeHtml(a.name||a.username)+' <small>@'+escapeHtml(a.username)+'</small></button>').join('')+(accounts.length>=3?'<p class="search-empty">Достигнут лимит: 3 аккаунта</p>':'<a class="add-account-link" href="/canan">＋ Добавить аккаунт</a>');
+    box.querySelectorAll('[data-account]').forEach(b=>b.onclick=()=>{const a=accounts.find(x=>String(x.id)===b.dataset.account);if(a){localStorage.setItem('token',a.token);location.href='/home'}});
   }
 
   // ---------- Список чатов ----------
