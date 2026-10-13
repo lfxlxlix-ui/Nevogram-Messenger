@@ -16,15 +16,11 @@
       <p class="auth-sub">Общайся со своими</p>
       <form id="authForm">
         <div id="emailStep">
-          <input id="emailInput" type="email" placeholder="Почта" autocomplete="email" required>
-          <button type="submit">Продолжить</button>
-          <p class="register-hint">Нет аккаунта? <a href="/register">Зарегистрируйтесь</a></p>
-        </div>
-        <div id="codeStep" class="hidden">
-          <p class="auth-sub">Введите 6-значный код из письма на <strong id="codeEmailLabel"></strong></p>
-          <input id="loginCodeInput" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="Код из 6 цифр" autocomplete="one-time-code">
-          <button type="button" id="verifyCodeBtn">Войти</button>
-          <button type="button" id="changeEmailBtn" class="auth-back-button">Изменить почту</button>
+          <input id="usernameInput" type="text" placeholder="Логин" autocomplete="username" required>
+          <input id="passwordInput" type="password" placeholder="Пароль" autocomplete="current-password" required>
+          <input id="twoFactorInput" type="password" inputmode="numeric" placeholder="Секретный код 2FA (если включён)" autocomplete="one-time-code">
+          <button type="submit">Войти</button>
+          <p class="register-hint">Нет аккаунта? <a href="/register">Зарегистрируйтесь по бета-коду</a></p>
         </div>
       </form>
       <div id="authError" class="auth-error"></div>
@@ -66,7 +62,7 @@
   <div id="directModal" class="modal hidden">
     <div class="modal-card">
       <h3>Написать человеку</h3>
-      <input id="directEmailInput" type="email" placeholder="Почта собеседника">
+      <input id="directEmailInput" type="email" placeholder="Логин собеседника">
       <div class="modal-error" id="directError"></div>
       <div class="modal-actions">
         <button class="btn-secondary" data-close>Отмена</button>
@@ -80,7 +76,7 @@
     <div class="modal-card">
       <h3>Новая группа</h3>
       <input id="groupNameInput" type="text" placeholder="Название группы">
-      <input id="groupEmailsInput" type="text" placeholder="Почты участников через запятую">
+      <input id="groupEmailsInput" type="text" placeholder="Логины участников через запятую">
       <div class="modal-error" id="groupError"></div>
       <div class="modal-actions">
         <button class="btn-secondary" data-close>Отмена</button>
@@ -94,9 +90,17 @@
   <div id="privacyModal" class="modal hidden">
     <div class="modal-card privacy-card">
       <div class="privacy-heading"><button class="privacy-back" data-close aria-label="Назад">‹</button><h3>Конфиденциальность</h3></div>
+      <p class="privacy-section-label">Безопасность аккаунта</p>
+      <div class="privacy-options">
+        <label class="privacy-row"><span>Включить двухфакторную защиту</span><input id="twoFactorEnabledInput" type="checkbox"></label>
+        <input id="securityCodeInput" type="password" inputmode="numeric" placeholder="Секретный код (6–12 цифр)">
+        <input id="securityPasswordInput" type="password" autocomplete="current-password" placeholder="Текущий пароль для подтверждения">
+        <div id="securityError" class="auth-error"></div>
+        <button class="btn-primary" id="securitySaveBtn" type="button">Сохранить защиту</button>
+      </div>
       <p class="privacy-section-label">Кто может видеть мои данные</p>
       <div class="privacy-options">
-        <label class="privacy-row"><span>Адрес электронной почты</span><select data-privacy="email"><option>Все</option><option>Контакты</option><option>Никто</option></select></label>
+        <label class="privacy-row"><span>Логин</span><select data-privacy="email"><option>Все</option><option>Контакты</option><option>Никто</option></select></label>
         <label class="privacy-row"><span>Время последнего захода</span><select data-privacy="online"><option>Все</option><option>Контакты</option><option>Никто</option></select></label>
         <label class="privacy-row"><span>Фотография профиля</span><select data-privacy="avatar"><option>Все</option><option>Контакты</option><option>Никто</option></select></label>
       </div>
