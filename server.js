@@ -293,7 +293,7 @@ app.get('/api/chats/:id/messages', authMiddleware, (req, res) => {
     id: m.id,
     chatId: m.chatId,
     senderId: m.senderId,
-    senderName: (state.users.find(u => u.id === m.senderId) || {}).name || '???',
+    senderName: m.senderId === 'nevogram-ai' ? 'Nevogram AI' : ((state.users.find(u => u.id === m.senderId) || {}).name || '???'),
     text: m.text,
     createdAt: m.createdAt,
     read: m.readBy.length > 1 // прочитано кем-то кроме автора
