@@ -265,6 +265,19 @@ app.post('/api/chats/group', authMiddleware, (req, res) => {
   res.json({ chat: chatPreview(chat, req.user.id) });
 });
 
+app.delete('/api/chats/:id', authMiddleware, (req, res) => {
+  const chat = state.chats.find(c => c.id === req.params.id && c.memberIds.includes(req.user.id));
+  if (!chat || chat.type !== 'direct') return res.status(404).json({ error: 'Личный чат не найден' });
+  const otherId = chat.memberIds.find(id => id !== req.user.id);
+  if (state.users.some(u => u.id === otherId)) {
+    return res.status(400).json({ error: 'Можно убрать только чат с удалённым аккаунтом' });
+  }
+  chat.memberIds = chat.memberIds.filter(id => id !== req.user.id);
+  io.in('user:' + req.user.id).socketsLeave(chat.id);
+  save();
+  res.json({ ok: true });
+});
+
 app.get('/api/chats/:id/messages', authMiddleware, (req, res) => {
   const chat = state.chats.find(c => c.id === req.params.id);
   if (!chat || !chat.memberIds.includes(req.user.id)) return res.status(403).json({ error: 'Нет доступа к этому чату' });
