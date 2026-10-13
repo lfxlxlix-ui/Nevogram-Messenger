@@ -7,7 +7,7 @@
 <input id="registerUsername" type="text" placeholder="Логин (3–24 символа)" autocomplete="username" pattern="[a-zA-Z0-9_]{3,24}" required>
 <input id="registerPassword" type="password" placeholder="Пароль (минимум 8 символов)" autocomplete="new-password" minlength="8" maxlength="72" required>
 <input id="registerPassword2" type="password" placeholder="Повторите пароль" autocomplete="new-password" minlength="8" maxlength="72" required>
-<button type="submit">Создать аккаунт</button></form>
+<button type="submit">Зарегистрироваться</button></form>
 <div id="registerError" class="auth-error"></div>
 <p class="register-hint">Уже есть аккаунт? <a href="/">Войти</a></p>
 </div></div>
@@ -16,5 +16,5 @@ const form=document.getElementById('registerForm'),err=document.getElementById('
 form.addEventListener('submit',async e=>{e.preventDefault();err.textContent='';
 const password=document.getElementById('registerPassword').value;
 if(password!==document.getElementById('registerPassword2').value){err.textContent='Пароли не совпадают';return;}
-try{const r=await fetch('/api/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({inviteCode:document.getElementById('inviteCode').value.trim(),username:document.getElementById('registerUsername').value.trim(),password})});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'Ошибка регистрации');location.href='/';}catch(e){err.textContent=e.message;}});
+try{const r=await fetch('/api/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({inviteCode:document.getElementById('inviteCode').value.trim(),username:document.getElementById('registerUsername').value.trim(),password})});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'Ошибка регистрации');if(d.token)localStorage.setItem('token',d.token);location.href='/cp';}catch(e){err.textContent=e.message;}});
 </script></body></html>
