@@ -15,7 +15,24 @@ const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/register', (req, res) => res.sendFile(path.join(__dirname, 'public', 'register.html')));
-app.get(['/login', '/home', '/settings'], (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+app.get(['/login', '/home', '/settings'], (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));\n
+app.get('/cp', (req, res) => {
+  res.type('html').send(`<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Настройка профиля — Nevogram</title><link rel="stylesheet" href="/style.css"><style>
+.cp-avatar{width:124px;height:124px;border-radius:50%;background:#202b38;border:2px solid #344457;color:#d9e5f2;font-size:42px;display:flex;align-items:center;justify-content:center;margin:0 auto 10px;cursor:pointer;overflow:hidden}.cp-avatar img{width:100%;height:100%;object-fit:cover}.cp-hint{text-align:center;color:#9eafc2;font-size:14px;margin-bottom:22px}.cp-label{display:block;text-align:left;margin:12px 0 6px;color:#d9e5f2}
+</style></head><body><main class="auth-screen"><section class="auth-card"><div class="auth-logo">✈️</div><h1>Настройка профиля</h1><p class="auth-sub">Добавь информацию о себе</p>
+<button type="button" id="avatarButton" class="cp-avatar" aria-label="Добавить фотографию">＋</button><p class="cp-hint">Нажми на круг, чтобы добавить аватар</p><input id="avatarFile" type="file" accept="image/*" capture="user" hidden>
+<label class="cp-label" for="firstName">Имя (обязательно)</label><input id="firstName" type="text" maxlength="40" placeholder="Имя" autocomplete="given-name" required>
+<label class="cp-label" for="lastName">Фамилия (необязательно)</label><input id="lastName" type="text" maxlength="40" placeholder="Фамилия" autocomplete="family-name">
+<div id="cpError" class="auth-error" role="alert"></div><button type="button" id="saveProfile">Продолжить</button>
+</section></main><script>
+const token=localStorage.getItem('token');const err=document.getElementById('cpError');const file=document.getElementById('avatarFile');const avatar=document.getElementById('avatarButton');let avatarData='';
+if(!token){location.replace('/register');}
+avatar.addEventListener('click',()=>file.click());
+file.addEventListener('change',()=>{const f=file.files&&file.files[0];if(!f)return;if(!f.type.startsWith('image/')){err.textContent='Выберите изображение.';return;}if(f.size>5*1024*1024){err.textContent='Фото должно быть не больше 5 МБ.';file.value='';return;}const reader=new FileReader();reader.onload=()=>{const img=new Image();img.onload=()=>{const canvas=document.createElement('canvas');const scale=Math.min(1,512/Math.max(img.width,img.height));canvas.width=Math.round(img.width*scale);canvas.height=Math.round(img.height*scale);canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);avatarData=canvas.toDataURL('image/jpeg',0.82);avatar.innerHTML='<img alt="Аватар профиля" src="'+avatarData+'">';err.textContent='';};img.src=reader.result;};reader.readAsDataURL(f);});
+document.getElementById('saveProfile').addEventListener('click',async()=>{err.textContent='';const firstName=document.getElementById('firstName').value.trim();const lastName=document.getElementById('lastName').value.trim();if(firstName.length<1){err.textContent='Введите имя';document.getElementById('firstName').focus();return;}try{const r=await fetch('/api/me/profile',{method:'PUT',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({firstName,lastName,avatar:avatarData})});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'Не удалось сохранить профиль');location.href='/home';}catch(e){err.textContent=e.message;}});
+</script></body></html>`);
+});
+
 
 // Public profile links use numeric IDs, for example /profile/1.
 app.get('/profile/:profileId', (req, res) => {
@@ -117,12 +134,12 @@ app.post('/api/register', async (req, res) => {
   const invite = state.invites.find(inv => !inv.used && bcrypt.compareSync(code, inv.codeHash));
   if (!invite) return res.status(401).json({ error: 'Бета-код недействителен или уже использован' });
   const nextPublicId = state.users.reduce((max, u, index) => Math.max(max, Number(u.publicId) || index + 1), 0) + 1;
-  const newUser = { id: nanoid(), publicId: nextPublicId, username, email: username, passwordHash: bcrypt.hashSync(password, 12), name: username, createdAt: Date.now(), twoFactorHash: null };
+  const newUser = { id: nanoid(), publicId: nextPublicId, username, email: username, passwordHash: bcrypt.hashSync(password, 12), name: username, firstName: '', lastName: '', avatar: '', createdAt: Date.now(), twoFactorHash: null };
   state.users.push(newUser);
   invite.used = true;
   invite.usedByUserId = newUser.id;
   save();
-  res.json({ ok: true, message: 'Аккаунт создан. Теперь войдите по логину и паролю.' });
+  res.json({ ok: true, token: sign({ userId: newUser.id }), user: publicUser(newUser) });
 });
 
 app.put('/api/me/security', authMiddleware, (req, res) => {
@@ -144,7 +161,7 @@ app.get('/api/me', authMiddleware, (req, res) => {
   res.json({ user: publicUser(req.user) });
 });
 
-app.patch('/api/me', authMiddleware, (req, res) => {
+app.put('/api/me/profile', authMiddleware, (req, res) => {\n  const firstName = String((req.body || {}).firstName || '').trim();\n  const lastName = String((req.body || {}).lastName || '').trim();\n  const avatar = String((req.body || {}).avatar || '');\n  if (!firstName) return res.status(400).json({ error: 'Введите имя' });\n  if (firstName.length > 40 || lastName.length > 40) return res.status(400).json({ error: 'Имя и фамилия должны быть не длиннее 40 символов' });\n  if (avatar && (!avatar.startsWith('data:image/jpeg;base64,') || avatar.length > 1500000)) return res.status(400).json({ error: 'Фото не подходит или слишком большое' });\n  req.user.firstName = firstName;\n  req.user.lastName = lastName;\n  req.user.name = [firstName, lastName].filter(Boolean).join(' ');\n  if (avatar) req.user.avatar = avatar;\n  save();\n  res.json({ ok: true, user: publicUser(req.user) });\n});\n\napp.patch('/api/me', authMiddleware, (req, res) => {
   const { name } = req.body || {};
   if (name && String(name).trim()) {
     req.user.name = String(name).trim().slice(0, 50);
