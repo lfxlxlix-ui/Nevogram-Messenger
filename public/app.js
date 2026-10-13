@@ -24,15 +24,28 @@
     return data;
   }
 
-  // ---------- Вход ----------
+  // ---------- Вход по почте и одноразовому коду ----------
+  let pendingLoginEmail = '';
   el('authForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     el('authError').textContent = '';
+    const email = el('emailInput').value.trim().toLowerCase();
     try {
-      const data = await api('/auth', {
-        method: 'POST',
-        body: { code: el('codeInput').value.trim(), email: el('emailInput').value.trim() }
-      });
+      await api('/auth/request-code', { method: 'POST', body: { email } });
+      pendingLoginEmail = email;
+      el('codeEmailLabel').textContent = email;
+      el('emailStep').classList.add('hidden');
+      el('codeStep').classList.remove('hidden');
+      el('loginCodeInput').focus();
+    } catch (err) {
+      el('authError').textContent = err.message;
+    }
+  });
+
+  el('verifyCodeBtn').addEventListener('click', async () => {
+    el('authError').textContent = '';
+    try {
+      const data = await api('/auth/verify-code', { method: 'POST', body: { email: pendingLoginEmail, code: el('loginCodeInput').value.trim() } });
       state.token = data.token;
       localStorage.setItem('token', data.token);
       state.me = data.user;
@@ -40,6 +53,13 @@
     } catch (err) {
       el('authError').textContent = err.message;
     }
+  });
+  el('loginCodeInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); el('verifyCodeBtn').click(); } });
+  el('changeEmailBtn').addEventListener('click', () => {
+    el('codeStep').classList.add('hidden');
+    el('emailStep').classList.remove('hidden');
+    el('loginCodeInput').value = '';
+    el('authError').textContent = '';
   });
 
   async function tryResumeSession() {
