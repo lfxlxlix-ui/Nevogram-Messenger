@@ -5,7 +5,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const bcrypt = require('bcryptjs');
 const { nanoid } = require('nanoid');
-const { state, save } = require('./db');
+const { state, save, init } = require('./db');
 
 const PORT = process.env.PORT || 3000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'changeme123';
@@ -403,6 +403,9 @@ io.on('connection', (socket) => {
   });
 });
 
-server.listen(PORT, () => {
-  console.log(`Мессенджер запущен на порту ${PORT}`);
+init().then(() => {
+  server.listen(PORT, () => console.log(`Мессенджер запущен на порту ${PORT}`));
+}).catch(err => {
+  console.error('Не удалось инициализировать хранилище:', err);
+  process.exit(1);
 });
