@@ -128,18 +128,19 @@ app.post('/api/register', async (req, res) => {
   const invite = state.invites.find(inv => !inv.used && bcrypt.compareSync(code, inv.codeHash));
   if (!invite) return res.status(401).json({ error: 'Код приглашения недействителен или уже использован' });
   const newUser = { id: nanoid(), email, codeHash: invite.codeHash, name: email.split('@')[0], createdAt: Date.now() };
-  state.users.push(newUser);
-  invite.used = true;
-  invite.usedByUserId = newUser.id;
-  save();
   const loginCode = makeSixDigitCode();
   try {
+    // Сначала отправляем письмо: при ошибке почты аккаунт и инвайт не расходуются.
     await sendLoginCode(email, loginCode);
+    state.users.push(newUser);
+    invite.used = true;
+    invite.usedByUserId = newUser.id;
+    save();
     loginCodes.set(email, { hash: crypto.createHash('sha256').update(loginCode).digest('hex'), expiresAt: Date.now() + 10 * 60_000, sentAt: Date.now(), attempts: 0, userId: newUser.id });
     res.json({ ok: true, message: 'Аккаунт создан. Код входа отправлен на почту.' });
   } catch (err) {
     console.error('Registration email failed:', err.message);
-    res.status(503).json({ error: err.message || 'Аккаунт создан, но письмо не отправлено. Настройте SMTP и запросите код входа.' });
+    res.status(503).json({ error: err.message || 'Не удалось отправить письмо. Проверьте почтовые настройки Render.' });
   }
 });
 
