@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nevogram — Админ-панель</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#0d1622;color:#e8eef5;font:16px system-ui,-apple-system,sans-serif;padding:20px}.wrap{max-width:680px;margin:7vh auto}.card{background:#172330;border:1px solid #283746;border-radius:18px;padding:22px;margin-bottom:16px}h1,h2{margin-top:0}p{color:#a9b6c4}input,button{font:inherit;border-radius:10px;padding:13px;width:100%;margin:6px 0}input{background:#202e3c;border:1px solid #354656;color:white}button{border:0;background:#4da3f5;color:#fff;font-weight:700;cursor:pointer}button.secondary{background:#2c3c4c}button:disabled{opacity:.6} .hidden{display:none}.status{white-space:pre-wrap;color:#c7d5e3;margin-top:10px}.code{font-size:1.5rem;letter-spacing:2px;overflow-wrap:anywhere}.row{border-top:1px solid #30404e;padding:12px 0;overflow-wrap:anywhere}.muted{color:#9aaaba;font-size:.9rem}
+</style>
+</head>
+<body><main class="wrap">
+<section class="card" id="login">
+<h1>🛠️ Nevogram — Админ-панель</h1><p>Войди с паролем администратора, заданным в настройках Render.</p>
+<form id="loginForm"><input id="password" type="password" placeholder="Пароль администратора" autocomplete="current-password" required><button>Войти</button></form>
+<div class="status" id="loginStatus"></div>
+</section>
+<section class="card hidden" id="panel">
+<h1>Управление Nevogram</h1><button id="makeInvite">＋ Создать код приглашения</button>
+<div id="newCode" class="status"></div>
+<h2>Коды приглашения</h2><button class="secondary" id="reloadInvites">Обновить список кодов</button><div id="invites"></div>
+<h2>Пользователи</h2><button class="secondary" id="reloadUsers">Обновить список пользователей</button><div id="users"></div>
+<button class="secondary" id="logout">Выйти</button><div class="status" id="panelStatus"></div>
+</section>
+</main>
+<script>
+let token='';
+const $=id=>document.getElementById(id);
+async function api(url,opts={}){const r=await fetch(url,{...opts,headers:{'Content-Type':'application/json','Authorization':'Bearer '+token,...(opts.headers||{})}});let data={};try{data=await r.json()}catch{}if(!r.ok)throw new Error(data.error||('Ошибка '+r.status));return data}
+$('loginForm').addEventListener('submit',async e=>{e.preventDefault();$('loginStatus').textContent='Проверяем пароль…';try{const r=await fetch('/api/admin/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:$('password').value})});const d=await r.json();if(!r.ok)throw new Error(d.error||'Не удалось войти');token=d.token;$('login').classList.add('hidden');$('panel').classList.remove('hidden');$('loginStatus').textContent='';await Promise.all([loadInvites(),loadUsers()])}catch(err){$('loginStatus').textContent=err.message}});
+$('makeInvite').onclick=async()=>{try{const d=await api('/api/admin/invites',{method:'POST',body:JSON.stringify({})});$('newCode').innerHTML='Новый код (сохрани его — повторно он не показывается):<div class="code"></div>'; $('newCode').querySelector('.code').textContent=d.code;await loadInvites()}catch(e){$('panelStatus').textContent=e.message}};
+async function loadInvites(){try{const d=await api('/api/admin/invites');$('invites').replaceChildren();if(!d.invites.length){$('invites').textContent='Пока кодов нет.';return}d.invites.forEach(x=>{const el=document.createElement('div');el.className='row';el.textContent=x.codePreview+' — '+(x.used?'использован'+(x.usedByEmail?' ('+x.usedByEmail+')':''):'не использован');$('invites').append(el)})}catch(e){$('panelStatus').textContent=e.message}}
+async function loadUsers(){try{const d=await api('/api/admin/users');$('users').replaceChildren();if(!d.users.length){$('users').textContent='Пока нет зарегистрированных пользователей.';return}d.users.forEach(x=>{const el=document.createElement('div');el.className='row';el.textContent=(x.name||'Без имени')+' — '+x.email;$('users').append(el)})}catch(e){$('panelStatus').textContent=e.message}}
+$('reloadInvites').onclick=loadInvites;$('reloadUsers').onclick=loadUsers;$('logout').onclick=()=>{token='';$('panel').classList.add('hidden');$('login').classList.remove('hidden');$('password').value='';$('newCode').textContent=''};
+</script></body></html>
