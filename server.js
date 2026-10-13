@@ -59,40 +59,87 @@ function publicUser(u) {
   return { id: u.id, email: u.email, name: u.name };
 }
 
-// ---------- Вход по инвайт-коду + почта ----------
-app.post('/api/auth', (req, res) => {
-  const { code, email } = req.body || {};
-  if (!code || !email) return res.status(400).json({ error: 'Введите код и почту' });
-  const normEmail = String(email).trim().toLowerCase();
+// ---------- Вход по почте с одноразовым кодом ----------
+const nodemailer = require('nodemailer');
+const loginCodes = new Map();
+function mailTransport() {
+  if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) return null;
+  return nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: Number(process.env.SMTP_PORT || 587),
+    secure: String(process.env.SMTP_SECURE || 'false') === 'true',
+    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
+  });
+}
+async function sendLoginCode(email, code) {
+  const transport = mailTransport();
+  if (!transport) throw new Error('Отправка почты ещё не настроена. Администратор должен добавить SMTP-настройки в Render.');
+  await transport.sendMail({
+    from: process.env.SMTP_FROM || process.env.SMTP_USER,
+    to: email,
+    subject: 'Код входа в Nevogram',
+    text: 'Ваш код входа в Nevogram: ' + code + '\nКод действует 10 минут. Если вы не запрашивали вход, просто проигнорируйте письмо.',
+    html: '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;padding:24px"><h2>Nevogram</h2><p>Ваш код входа:</p><div style="font-size:32px;letter-spacing:8px;font-weight:bold;padding:18px;background:#f1f4f8;border-radius:12px;text-align:center">' + code + '</div><p>Код действует 10 минут. Никому не сообщайте его.</p></div>'
+  });
+}
+function makeSixDigitCode() { return String(crypto.randomInt(0, 1000000)).padStart(6, '0'); }
 
-  // Уже есть пользователь с такой почтой? Проверяем, что код совпадает с его кодом.
-  const existingUser = state.users.find(u => u.email === normEmail);
-  if (existingUser) {
-    if (!bcrypt.compareSync(code, existingUser.codeHash)) {
-      return res.status(401).json({ error: 'Неверный код для этой почты' });
-    }
-    const token = sign({ userId: existingUser.id });
-    return res.json({ token, user: publicUser(existingUser) });
+app.post('/api/auth/request-code', async (req, res) => {
+  const email = String((req.body || {}).email || '').trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Введите корректную почту' });
+  const user = state.users.find(u => u.email === email);
+  if (!user) return res.status(404).json({ error: 'Аккаунт с такой почтой не найден. Зарегистрируйтесь по приглашению.' });
+  const previous = loginCodes.get(email);
+  if (previous && Date.now() - previous.sentAt < 60_000) return res.status(429).json({ error: 'Подождите минуту перед повторной отправкой кода' });
+  const code = makeSixDigitCode();
+  try {
+    await sendLoginCode(email, code);
+    loginCodes.set(email, { hash: crypto.createHash('sha256').update(code).digest('hex'), expiresAt: Date.now() + 10 * 60_000, sentAt: Date.now(), attempts: 0, userId: user.id });
+    res.json({ ok: true, message: 'Код отправлен на почту' });
+  } catch (err) {
+    console.error('Email send failed:', err.message);
+    res.status(503).json({ error: err.message || 'Не удалось отправить письмо' });
   }
+});
 
-  // Новый пользователь — код должен быть неиспользованным инвайтом
+app.post('/api/auth/verify-code', (req, res) => {
+  const email = String((req.body || {}).email || '').trim().toLowerCase();
+  const code = String((req.body || {}).code || '').trim();
+  if (!/^\d{6}$/.test(code)) return res.status(400).json({ error: 'Введите код из 6 цифр' });
+  const pending = loginCodes.get(email);
+  if (!pending || pending.expiresAt < Date.now()) { loginCodes.delete(email); return res.status(401).json({ error: 'Код истёк или не запрашивался. Запросите новый.' }); }
+  pending.attempts++;
+  const hash = crypto.createHash('sha256').update(code).digest('hex');
+  if (pending.attempts > 5) { loginCodes.delete(email); return res.status(429).json({ error: 'Слишком много попыток. Запросите новый код.' }); }
+  if (hash !== pending.hash) return res.status(401).json({ error: 'Неверный код' });
+  const user = state.users.find(u => u.id === pending.userId && u.email === email);
+  loginCodes.delete(email);
+  if (!user) return res.status(401).json({ error: 'Аккаунт не найден' });
+  res.json({ token: sign({ userId: user.id }), user: publicUser(user) });
+});
+
+app.post('/api/register', async (req, res) => {
+  const email = String((req.body || {}).email || '').trim().toLowerCase();
+  const code = String((req.body || {}).inviteCode || '').trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Введите корректную почту' });
+  if (!code) return res.status(400).json({ error: 'Введите код приглашения' });
+  if (state.users.some(u => u.email === email)) return res.status(409).json({ error: 'Аккаунт с такой почтой уже существует. Войдите.' });
   const invite = state.invites.find(inv => !inv.used && bcrypt.compareSync(code, inv.codeHash));
-  if (!invite) return res.status(401).json({ error: 'Код недействителен или уже использован' });
-
-  const newUser = {
-    id: nanoid(),
-    email: normEmail,
-    codeHash: invite.codeHash, // тот же код станет постоянным ключом входа для этого человека
-    name: normEmail.split('@')[0],
-    createdAt: Date.now()
-  };
+  if (!invite) return res.status(401).json({ error: 'Код приглашения недействителен или уже использован' });
+  const newUser = { id: nanoid(), email, codeHash: invite.codeHash, name: email.split('@')[0], createdAt: Date.now() };
   state.users.push(newUser);
   invite.used = true;
   invite.usedByUserId = newUser.id;
   save();
-
-  const token = sign({ userId: newUser.id });
-  res.json({ token, user: publicUser(newUser) });
+  const loginCode = makeSixDigitCode();
+  try {
+    await sendLoginCode(email, loginCode);
+    loginCodes.set(email, { hash: crypto.createHash('sha256').update(loginCode).digest('hex'), expiresAt: Date.now() + 10 * 60_000, sentAt: Date.now(), attempts: 0, userId: newUser.id });
+    res.json({ ok: true, message: 'Аккаунт создан. Код входа отправлен на почту.' });
+  } catch (err) {
+    console.error('Registration email failed:', err.message);
+    res.status(503).json({ error: err.message || 'Аккаунт создан, но письмо не отправлено. Настройте SMTP и запросите код входа.' });
+  }
 });
 
 app.get('/api/me', authMiddleware, (req, res) => {
