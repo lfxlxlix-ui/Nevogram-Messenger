@@ -252,7 +252,8 @@
     el('privacyModal').classList.remove('hidden');
   });
   el('privacySaveBtn').addEventListener('click', savePrivacySettings);
-\n  // ---------- Утилиты ----------
+
+  // ---------- Утилиты ----------
   function formatTime(ts) {
     const d = new Date(ts);
     return d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
