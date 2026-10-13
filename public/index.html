@@ -28,7 +28,9 @@
     <aside class="sidebar">
       <div class="sidebar-header">
         <div class="me" id="meName">Я</div>
-        <div class="sidebar-actions">
+        <div class="sidebar-actions">\n
+  <button id="privacyOpenBtn" class="privacy-open-btn" title="Конфиденциальность" aria-label="Конфиденциальность">♧</button>
+
           <button id="newDirectBtn" title="Новый чат">✎</button>
           <button id="newGroupBtn" title="Новая группа">👥</button>
         </div>
@@ -79,7 +81,29 @@
     </div>
   </div>
 
-  <script src="/socket.io/socket.io.js"></script>
+
+  <!-- Настройки конфиденциальности -->
+  <div id="privacyModal" class="modal hidden">
+    <div class="modal-card privacy-card">
+      <div class="privacy-heading"><button class="privacy-back" data-close aria-label="Назад">‹</button><h3>Конфиденциальность</h3></div>
+      <p class="privacy-section-label">Кто может видеть мои данные</p>
+      <div class="privacy-options">
+        <label class="privacy-row"><span>Адрес электронной почты</span><select data-privacy="email"><option>Все</option><option>Контакты</option><option>Никто</option></select></label>
+        <label class="privacy-row"><span>Статус «В сети»</span><select data-privacy="online"><option>Все</option><option>Контакты</option><option>Никто</option></select></label>
+        <label class="privacy-row"><span>Фотография профиля</span><select data-privacy="avatar"><option>Все</option><option>Контакты</option><option>Никто</option></select></label>
+      </div>
+      <p class="privacy-section-label">Кто может связываться со мной</p>
+      <div class="privacy-options">
+        <label class="privacy-row"><span>Писать мне</span><select data-privacy="messages"><option>Все</option><option>Контакты</option></select></label>
+        <label class="privacy-row"><span>Добавлять в группы</span><select data-privacy="groups"><option>Все</option><option>Контакты</option><option>Никто</option></select></label>
+        <label class="privacy-row"><span>Приглашать в каналы</span><select data-privacy="channels"><option>Все</option><option>Контакты</option><option>Никто</option></select></label>
+        <label class="privacy-row"><span>Находить по юзернейму</span><select data-privacy="username"><option>Все</option><option>Никто</option></select></label>
+      </div>
+      <p class="privacy-note">Настройки пока сохраняются в этом браузере. Для применения ограничений к перепискам и приглашениям потребуется подключить их к серверу.</p>
+      <div class="modal-actions"><button class="btn-primary" id="privacySaveBtn">Готово</button></div>
+    </div>
+  </div>
+\n  <script src="/socket.io/socket.io.js"></script>
   <script src="/app.js"></script>
 </body>
             </html>
