@@ -82,6 +82,10 @@
   function connectSocket() {
     state.socket = io({ auth: { token: state.token } });
 
+    state.socket.on('chat:new', () => {
+      loadChats().catch(() => {});
+    });
+
     state.socket.on('message:new', (msg) => {
       if (state.activeChat && msg.chatId === state.activeChat.id) {
         renderMessage(msg);
