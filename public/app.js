@@ -24,28 +24,21 @@
     return data;
   }
 
-  // ---------- Вход по почте и одноразовому коду ----------
-  let pendingLoginEmail = '';
+  // ---------- Вход по логину и паролю с опциональным 2FA-кодом ----------
   el('authForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     el('authError').textContent = '';
-    const email = el('emailInput').value.trim().toLowerCase();
     try {
-      await api('/auth/request-code', { method: 'POST', body: { email } });
-      pendingLoginEmail = email;
-      el('codeEmailLabel').textContent = email;
-      el('emailStep').classList.add('hidden');
-      el('codeStep').classList.remove('hidden');
-      el('loginCodeInput').focus();
-    } catch (err) {
-      el('authError').textContent = err.message;
-    }
-  });
-
-  el('verifyCodeBtn').addEventListener('click', async () => {
-    el('authError').textContent = '';
-    try {
-      const data = await api('/auth/verify-code', { method: 'POST', body: { email: pendingLoginEmail, code: el('loginCodeInput').value.trim() } });
+      const data = await api('/auth/login', { method: 'POST', body: {
+        username: el('usernameInput').value.trim().toLowerCase(),
+        password: el('passwordInput').value,
+        twoFactorCode: el('twoFactorInput').value.trim()
+      }});
+      if (data.requiresTwoFactor) {
+        el('authError').textContent = 'Введите секретный код 2FA в поле ниже и нажмите «Войти» ещё раз.';
+        el('twoFactorInput').focus();
+        return;
+      }
       state.token = data.token;
       localStorage.setItem('token', data.token);
       state.me = data.user;
@@ -53,13 +46,6 @@
     } catch (err) {
       el('authError').textContent = err.message;
     }
-  });
-  el('loginCodeInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); el('verifyCodeBtn').click(); } });
-  el('changeEmailBtn').addEventListener('click', () => {
-    el('codeStep').classList.add('hidden');
-    el('emailStep').classList.remove('hidden');
-    el('loginCodeInput').value = '';
-    el('authError').textContent = '';
   });
 
   async function tryResumeSession() {
@@ -83,7 +69,7 @@
   function startApp() {
     el('authScreen').classList.add('hidden');
     el('app').classList.remove('hidden');
-    el('meName').textContent = state.me.name + ' · ' + state.me.email;
+    el('meName').textContent = state.me.name + ' · @' + (state.me.username || state.me.email);
     connectSocket();
     loadChats();
   }
@@ -231,6 +217,19 @@
   });
 
 
+  // ---------- Настройки двухфакторной защиты ----------
+  el('securitySaveBtn').addEventListener('click', async () => {
+    el('securityError').textContent = '';
+    try {
+      const enabled = el('twoFactorEnabledInput').checked;
+      const result = await api('/me/security', { method: 'PUT', body: { enabled, password: el('securityPasswordInput').value, secretCode: el('securityCodeInput').value.trim() } });
+      if (state.me) state.me.twoFactorEnabled = result.enabled;
+      el('securityError').textContent = enabled ? 'Двухфакторная защита включена.' : 'Двухфакторная защита выключена.';
+      el('securityPasswordInput').value = '';
+      el('securityCodeInput').value = '';
+    } catch (err) { el('securityError').textContent = err.message; }
+  });
+
   // ---------- Конфиденциальность ----------
   const privacyDefaults = { email: 'Все', online: 'Все', avatar: 'Все', messages: 'Все', groups: 'Все', channels: 'Все', username: 'Все' };
   function loadPrivacySettings() {
@@ -249,6 +248,7 @@
   }
   el('privacyOpenBtn').addEventListener('click', () => {
     loadPrivacySettings();
+    el('twoFactorEnabledInput').checked = Boolean(state.me && state.me.twoFactorEnabled);
     el('privacyModal').classList.remove('hidden');
   });
   el('privacySaveBtn').addEventListener('click', savePrivacySettings);
