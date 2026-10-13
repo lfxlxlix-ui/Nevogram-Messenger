@@ -158,6 +158,30 @@ app.put('/api/me/security', authMiddleware, (req, res) => {
   res.json({ ok: true, enabled: Boolean(req.user.twoFactorHash) });
 });
 
+app.post('/api/ai/chat', authMiddleware, async (req, res) => {
+  if (!process.env.OPENAI_API_KEY) return res.status(503).json({ error: 'Nevogram AI ещё не настроен. Добавьте OPENAI_API_KEY в Render.' });
+  const incoming = Array.isArray((req.body || {}).messages) ? req.body.messages : [];
+  const messages = incoming.filter(m => m && ['user', 'assistant'].includes(m.role) && typeof m.content === 'string')
+    .map(m => ({ role: m.role, content: m.content.slice(0, 4000) })).slice(-12);
+  if (!messages.length || messages[messages.length - 1].role !== 'user') return res.status(400).json({ error: 'Напишите сообщение для ИИ' });
+  try {
+    const upstream = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + process.env.OPENAI_API_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: process.env.OPENAI_MODEL || 'gpt-4.1-mini', messages: [
+        { role: 'system', content: 'Ты Nevogram AI, дружелюбный и полезный ИИ-помощник внутри мессенджера. Отвечай на языке пользователя, обычно по-русски. Не утверждай, что можешь выполнять действия вне доступных функций.' },
+        ...messages
+      ], max_tokens: 700 })
+    });
+    const data = await upstream.json().catch(() => ({}));
+    if (!upstream.ok) return res.status(upstream.status === 429 ? 429 : 502).json({ error: data.error?.message || 'Ошибка API ИИ' });
+    return res.json({ reply: data.choices?.[0]?.message?.content || 'Не удалось сформировать ответ.' });
+  } catch (err) {
+    console.error('Nevogram AI request failed:', err.message);
+    return res.status(502).json({ error: 'Не удалось подключиться к ИИ' });
+  }
+});
+
 app.get('/api/me', authMiddleware, (req, res) => {
   res.json({ user: publicUser(req.user) });
 });
