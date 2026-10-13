@@ -113,11 +113,25 @@
     });
   }
 
+  function normalizeAccounts(accounts) {
+    const unique = [];
+    const seen = new Set();
+    for (const a of Array.isArray(accounts) ? accounts : []) {
+      if (!a || !a.id || !a.token) continue;
+      const id = String(a.id);
+      if (seen.has(id)) continue;
+      seen.add(id);
+      unique.push({ ...a, id });
+    }
+    return unique.slice(0, 3);
+  }
   function rememberAccount() {
-    let accounts=[]; try{accounts=JSON.parse(localStorage.getItem('nevogramAccounts')||'[]')}catch(_){}
-    if(!Array.isArray(accounts))accounts=[];
-    const a={token:state.token,id:state.me.id,username:state.me.username||state.me.email,name:state.me.name||state.me.username};
-    accounts=accounts.filter(x=>x.id!==a.id);accounts.unshift(a);localStorage.setItem('nevogramAccounts',JSON.stringify(accounts.slice(0,3)));
+    let accounts = [];
+    try { accounts = JSON.parse(localStorage.getItem('nevogramAccounts') || '[]'); } catch (_) {}
+    const a = { token: state.token, id: String(state.me.id), username: state.me.username || state.me.email, name: state.me.name || state.me.username };
+    accounts = normalizeAccounts(accounts).filter(x => String(x.id) !== a.id);
+    accounts.unshift(a);
+    localStorage.setItem('nevogramAccounts', JSON.stringify(accounts.slice(0, 3)));
   }
   function setupNavigation(){
     document.querySelectorAll('[data-nav]').forEach(a=>a.classList.toggle('active',a.dataset.nav===(location.pathname==='/settings'?'settings':'home')));
@@ -136,7 +150,8 @@
   }
   function renderAccountList(){
     let accounts=[];try{accounts=JSON.parse(localStorage.getItem('nevogramAccounts')||'[]')}catch(_){}
-    if(!Array.isArray(accounts))accounts=[];
+    accounts=normalizeAccounts(accounts);
+    localStorage.setItem('nevogramAccounts',JSON.stringify(accounts));
     const box=el('accountList');box.innerHTML='<p class="account-heading">Аккаунты ('+accounts.length+'/3)</p>'+accounts.map(a=>'<button class="account-option" data-account="'+escapeHtml(a.id)+'">'+escapeHtml(a.name||a.username)+' <small>@'+escapeHtml(a.username)+'</small></button>').join('')+(accounts.length>=3?'<p class="search-empty">Достигнут лимит: 3 аккаунта</p>':'<a class="add-account-link" href="/canan">＋ Добавить аккаунт</a>');
     box.querySelectorAll('[data-account]').forEach(b=>b.onclick=()=>{const a=accounts.find(x=>String(x.id)===b.dataset.account);if(a){localStorage.setItem('token',a.token);location.href='/home'}});
   }
