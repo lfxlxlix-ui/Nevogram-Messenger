@@ -215,7 +215,7 @@
       state.aiHistory.push({ role: 'assistant', content: data.reply });
       appendAIMessage('assistant', data.reply);
     } catch (err) {
-      appendAIMessage('assistant', 'Не удалось получить ответ: ' + err.message);
+      appendAIMessage('assistant', /no credits remaining|insufficient_quota|billing/i.test(err.message) ? 'У Nevogram AI закончились доступные API-кредиты. Администратору нужно проверить баланс и лимиты ИИ-сервиса.' : 'Не удалось получить ответ: ' + err.message);
     } finally {
       state.aiBusy = false;
       input.disabled = false;
