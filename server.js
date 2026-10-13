@@ -15,6 +15,32 @@ const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/register', (req, res) => res.sendFile(path.join(__dirname, 'public', 'register.html')));
+app.get(['/login', '/home', '/settings'], (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+
+// Public profile links look like /profile/@username.
+app.get('/profile/:handle', (req, res) => {
+  const handle = String(req.params.handle || '').replace(/^@/, '').trim().toLowerCase();
+  const user = state.users.find(u => (u.username || u.email || '').toLowerCase() === handle);
+  if (!user) {
+    return res.status(404).type('html').send(`<!doctype html><html lang="ru"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Профиль не найден — Nevogram</title><link rel="stylesheet" href="/style.css"><body><main class="auth-screen"><section class="auth-card"><h1>Профиль не найден</h1><p class="auth-sub">Проверьте ссылку или логин пользователя.</p><a href="/login">Вернуться в Nevogram</a></section></main></body></html>`);
+  }
+  const esc = value => String(value || '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  const username = esc(user.username || user.email);
+  const name = esc(user.name || user.username || user.email);
+  res.type('html').send(`<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0e1621"><title>${name} (@${username}) — Nevogram</title><link rel="stylesheet" href="/style.css"></head><body><main class="auth-screen"><section class="auth-card"><div class="auth-logo">✈️</div><h1>${name}</h1><p class="auth-sub">@${username}</p><p>Профиль пользователя Nevogram</p><a href="/login">Войти в Nevogram</a></section></main></body></html>`);
+});
+
+app.get('/admin', (req, res) => {
+  res.type('html').send(`<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0e1621"><title>Админ-панель — Nevogram</title><link rel="stylesheet" href="/style.css"></head><body><main class="auth-screen"><section class="auth-card" style="max-width:680px"><div class="auth-logo">✈️</div><h1>Nevogram Admin</h1><p class="auth-sub">Управление бета-приглашениями и пользователями</p><form id="adminLogin"><input id="adminPassword" type="password" placeholder="Пароль администратора" autocomplete="current-password" required><button>Войти</button></form><div id="adminError" class="auth-error"></div><section id="adminPanel" hidden><button id="createInvite" type="button">Создать бета-код</button><p id="newInvite"></p><h2>Приглашения</h2><div id="invites"></div><h2>Пользователи</h2><div id="users"></div></section><p class="register-hint"><a href="/home">Открыть мессенджер</a></p></section></main><script>
+let adminToken= sessionStorage.getItem('nevogramAdminToken')||'';
+const err=document.getElementById('adminError');
+async function call(path,method='GET'){const r=await fetch('/api/admin'+path,{method,headers:{'Content-Type':'application/json',...(adminToken?{Authorization:'Bearer '+adminToken}:{})}});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'Ошибка запроса');return d;}
+async function refresh(){const [i,u]=await Promise.all([call('/invites'),call('/users')]);document.getElementById('invites').innerHTML=i.invites.map(v=>'<p>'+v.codePreview+' · '+(v.used?'использован':'свободен')+'</p>').join('')||'<p>Пока нет кодов</p>';document.getElementById('users').innerHTML=u.users.map(v=>'<p>@'+String(v.name||v.email).replace(/[&<>"]/g,'')+'</p>').join('')||'<p>Пока нет пользователей</p>';}
+document.getElementById('adminLogin').addEventListener('submit',async e=>{e.preventDefault();err.textContent='';try{const r=await fetch('/api/admin/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:document.getElementById('adminPassword').value})});const d=await r.json();if(!r.ok)throw new Error(d.error||'Ошибка входа');adminToken=d.token;sessionStorage.setItem('nevogramAdminToken',adminToken);document.getElementById('adminPanel').hidden=false;document.getElementById('adminPassword').value='';await refresh();}catch(e){err.textContent=e.message;}});
+document.getElementById('createInvite').addEventListener('click',async()=>{try{const d=await call('/invites','POST');document.getElementById('newInvite').textContent='Новый код (сохраните сейчас, он показывается один раз): '+d.code;await refresh();}catch(e){err.textContent=e.message;}});
+if(adminToken){document.getElementById('adminPanel').hidden=false;refresh().catch(e=>{sessionStorage.removeItem('nevogramAdminToken');adminToken='';err.textContent=e.message;document.getElementById('adminPanel').hidden=true;});}
+</script></body></html>`);
+});
 
 const server = http.createServer(app);
 const io = new Server(server);
