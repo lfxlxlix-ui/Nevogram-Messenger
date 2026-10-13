@@ -60,88 +60,55 @@ function publicUser(u) {
   return { id: u.id, email: u.email, name: u.name };
 }
 
-// ---------- Вход по почте с одноразовым кодом ----------
-const nodemailer = require('nodemailer');
-const loginCodes = new Map();
-function mailTransport() {
-  if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) return null;
-  return nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT || 587),
-    secure: String(process.env.SMTP_SECURE || 'false') === 'true',
-    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
-  });
-}
-async function sendLoginCode(email, code) {
-  const transport = mailTransport();
-  if (!transport) throw new Error('Отправка почты ещё не настроена. Администратор должен добавить SMTP-настройки в Render.');
-  await transport.sendMail({
-    from: process.env.SMTP_FROM || process.env.SMTP_USER,
-    to: email,
-    subject: 'Код входа в Nevogram',
-    text: 'Ваш код входа в Nevogram: ' + code + '\nКод действует 10 минут. Если вы не запрашивали вход, просто проигнорируйте письмо.',
-    html: '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;padding:24px"><h2>Nevogram</h2><p>Ваш код входа:</p><div style="font-size:32px;letter-spacing:8px;font-weight:bold;padding:18px;background:#f1f4f8;border-radius:12px;text-align:center">' + code + '</div><p>Код действует 10 минут. Никому не сообщайте его.</p></div>'
-  });
-}
-function makeSixDigitCode() { return String(crypto.randomInt(0, 1000000)).padStart(6, '0'); }
-
-app.post('/api/auth/request-code', async (req, res) => {
-  const email = String((req.body || {}).email || '').trim().toLowerCase();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Введите корректную почту' });
-  const user = state.users.find(u => u.email === email);
-  if (!user) return res.status(404).json({ error: 'Аккаунт с такой почтой не найден. Зарегистрируйтесь по приглашению.' });
-  const previous = loginCodes.get(email);
-  if (previous && Date.now() - previous.sentAt < 60_000) return res.status(429).json({ error: 'Подождите минуту перед повторной отправкой кода' });
-  const code = makeSixDigitCode();
-  try {
-    await sendLoginCode(email, code);
-    loginCodes.set(email, { hash: crypto.createHash('sha256').update(code).digest('hex'), expiresAt: Date.now() + 10 * 60_000, sentAt: Date.now(), attempts: 0, userId: user.id });
-    res.json({ ok: true, message: 'Код отправлен на почту' });
-  } catch (err) {
-    console.error('Email send failed:', err.message);
-    res.status(503).json({ error: err.message || 'Не удалось отправить письмо' });
+// ---------- Регистрация по инвайту и вход по логину/паролю ----------
+// Пароли и секреты 2FA хранятся только в виде bcrypt-хешей.
+app.post('/api/auth/login', async (req, res) => {
+  const username = String((req.body || {}).username || '').trim().toLowerCase();
+  const password = String((req.body || {}).password || '');
+  const twoFactorCode = String((req.body || {}).twoFactorCode || '').trim();
+  if (!username || !password) return res.status(400).json({ error: 'Введите логин и пароль' });
+  const user = state.users.find(u => (u.username || u.email || '').toLowerCase() === username);
+  if (!user || !user.passwordHash || !bcrypt.compareSync(password, user.passwordHash)) {
+    return res.status(401).json({ error: 'Неверный логин или пароль. Старые аккаунты нужно создать заново по инвайту.' });
   }
-});
-
-app.post('/api/auth/verify-code', (req, res) => {
-  const email = String((req.body || {}).email || '').trim().toLowerCase();
-  const code = String((req.body || {}).code || '').trim();
-  if (!/^\d{6}$/.test(code)) return res.status(400).json({ error: 'Введите код из 6 цифр' });
-  const pending = loginCodes.get(email);
-  if (!pending || pending.expiresAt < Date.now()) { loginCodes.delete(email); return res.status(401).json({ error: 'Код истёк или не запрашивался. Запросите новый.' }); }
-  pending.attempts++;
-  const hash = crypto.createHash('sha256').update(code).digest('hex');
-  if (pending.attempts > 5) { loginCodes.delete(email); return res.status(429).json({ error: 'Слишком много попыток. Запросите новый код.' }); }
-  if (hash !== pending.hash) return res.status(401).json({ error: 'Неверный код' });
-  const user = state.users.find(u => u.id === pending.userId && u.email === email);
-  loginCodes.delete(email);
-  if (!user) return res.status(401).json({ error: 'Аккаунт не найден' });
+  if (user.twoFactorHash) {
+    if (!twoFactorCode) return res.status(200).json({ requiresTwoFactor: true });
+    if (!bcrypt.compareSync(twoFactorCode, user.twoFactorHash)) return res.status(401).json({ error: 'Неверный секретный код двухфакторной защиты' });
+  }
   res.json({ token: sign({ userId: user.id }), user: publicUser(user) });
 });
 
 app.post('/api/register', async (req, res) => {
-  const email = String((req.body || {}).email || '').trim().toLowerCase();
+  const username = String((req.body || {}).username || '').trim().toLowerCase();
+  const password = String((req.body || {}).password || '');
   const code = String((req.body || {}).inviteCode || '').trim();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Введите корректную почту' });
-  if (!code) return res.status(400).json({ error: 'Введите код приглашения' });
-  if (state.users.some(u => u.email === email)) return res.status(409).json({ error: 'Аккаунт с такой почтой уже существует. Войдите.' });
+  if (!/^[a-z0-9_]{3,24}$/.test(username)) return res.status(400).json({ error: 'Логин: 3–24 символа, только латинские буквы, цифры и _' });
+  if (password.length < 8 || Buffer.byteLength(password, 'utf8') > 72) return res.status(400).json({ error: 'Пароль должен быть не короче 8 символов и не длиннее 72 байт' });
+  if (!code) return res.status(400).json({ error: 'Введите бета-код приглашения' });
+  if (state.users.some(u => (u.username || u.email || '').toLowerCase() === username)) return res.status(409).json({ error: 'Этот логин уже занят' });
   const invite = state.invites.find(inv => !inv.used && bcrypt.compareSync(code, inv.codeHash));
-  if (!invite) return res.status(401).json({ error: 'Код приглашения недействителен или уже использован' });
-  const newUser = { id: nanoid(), email, codeHash: invite.codeHash, name: email.split('@')[0], createdAt: Date.now() };
-  const loginCode = makeSixDigitCode();
-  try {
-    // Сначала отправляем письмо: при ошибке почты аккаунт и инвайт не расходуются.
-    await sendLoginCode(email, loginCode);
-    state.users.push(newUser);
-    invite.used = true;
-    invite.usedByUserId = newUser.id;
-    save();
-    loginCodes.set(email, { hash: crypto.createHash('sha256').update(loginCode).digest('hex'), expiresAt: Date.now() + 10 * 60_000, sentAt: Date.now(), attempts: 0, userId: newUser.id });
-    res.json({ ok: true, message: 'Аккаунт создан. Код входа отправлен на почту.' });
-  } catch (err) {
-    console.error('Registration email failed:', err.message);
-    res.status(503).json({ error: err.message || 'Не удалось отправить письмо. Проверьте почтовые настройки Render.' });
+  if (!invite) return res.status(401).json({ error: 'Бета-код недействителен или уже использован' });
+  const newUser = { id: nanoid(), username, email: username, passwordHash: bcrypt.hashSync(password, 12), name: username, createdAt: Date.now(), twoFactorHash: null };
+  state.users.push(newUser);
+  invite.used = true;
+  invite.usedByUserId = newUser.id;
+  save();
+  res.json({ ok: true, message: 'Аккаунт создан. Теперь войдите по логину и паролю.' });
+});
+
+app.put('/api/me/security', authMiddleware, (req, res) => {
+  const password = String((req.body || {}).password || '');
+  const secretCode = String((req.body || {}).secretCode || '').trim();
+  const enabled = Boolean((req.body || {}).enabled);
+  if (!req.user.passwordHash || !bcrypt.compareSync(password, req.user.passwordHash)) return res.status(401).json({ error: 'Для изменения защиты введите текущий пароль' });
+  if (enabled) {
+    if (!/^\d{6,12}$/.test(secretCode)) return res.status(400).json({ error: 'Секретный код должен содержать от 6 до 12 цифр' });
+    req.user.twoFactorHash = bcrypt.hashSync(secretCode, 12);
+  } else {
+    req.user.twoFactorHash = null;
   }
+  save();
+  res.json({ ok: true, enabled: Boolean(req.user.twoFactorHash) });
 });
 
 app.get('/api/me', authMiddleware, (req, res) => {
