@@ -388,6 +388,18 @@ io.on('connection', (socket) => {
     save();
     const senderName = (state.users.find(u => u.id === socket.userId) || {}).name;
     io.to(chatId).emit('message:new', { ...msg, senderName });
+    if (chat.type === 'group' && /@nevogramai\\b/i.test(clean)) {
+      const prompt = clean.replace(/@nevogramai\\b/ig, '').trim();
+      const prior = state.messages.filter(m => m.chatId === chatId && m.id !== msg.id).slice(-10)
+        .map(m => ({ role: m.senderId === 'nevogram-ai' ? 'assistant' : 'user', content: m.text }));
+      const history = [...prior, { role: 'user', content: prompt || clean }].slice(-12);
+      askNevogramAI(history).then(reply => {
+        const aiMsg = { id: nanoid(), chatId, senderId: 'nevogram-ai', text: reply.slice(0, 4000), createdAt: Date.now(), readBy: [], senderName: 'Nevogram AI' };
+        state.messages.push(aiMsg);
+        save();
+        io.to(chatId).emit('message:new', aiMsg);
+      }).catch(e => console.error('Nevogram AI group mention error:', e.message));
+    }
     if (isFirstMessage && chat.type === 'direct') {
       chat.memberIds.forEach(userId => io.to('user:' + userId).emit('chat:new'));
     }
