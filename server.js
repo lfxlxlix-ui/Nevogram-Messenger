@@ -14,7 +14,7 @@ const SESSION_SECRET = process.env.SESSION_SECRET || 'please-change-this-secret-
 const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
-app.get('/register', (req, res) => res.sendFile(path.join(__dirname, 'public', 'register.html')));
+app.get(['/register', '/canan'], (req, res) => res.sendFile(path.join(__dirname, 'public', 'register.html')));
 app.get(['/login', '/home', '/settings'], (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 app.get('/cp', (req, res) => {
@@ -206,6 +206,21 @@ function chatPreview(chat, userId) {
   };
 }
 
+app.get('/api/search/users', authMiddleware, (req, res) => {
+  const q = String(req.query.q || '').trim().replace(/^@/, '').toLowerCase();
+  if (!q) return res.json({ users: [] });
+  const users = state.users.filter(u => u.id !== req.user.id && (u.username || u.email || '').toLowerCase().includes(q))
+    .slice(0, 20).map(u => ({ id: u.id, username: u.username || u.email, name: u.name || u.username || u.email, publicId: u.publicId }));
+  res.json({ users });
+});
+app.post('/api/chats/:id/read', authMiddleware, (req, res) => {
+  const chat = state.chats.find(c => c.id === req.params.id && c.memberIds.includes(req.user.id));
+  if (!chat) return res.status(404).json({ error: 'Чат не найден' });
+  state.messages.forEach(m => { if (m.chatId === chat.id && !m.readBy.includes(req.user.id)) m.readBy.push(req.user.id); });
+  save();
+  io.to(chat.id).emit('read', { chatId: chat.id, userId: req.user.id });
+  res.json({ ok: true });
+});
 app.get('/api/chats', authMiddleware, (req, res) => {
   const myChats = state.chats.filter(c => c.memberIds.includes(req.user.id) && (c.type !== 'direct' || state.messages.some(m => m.chatId === c.id)));
   const list = myChats.map(c => chatPreview(c, req.user.id));
