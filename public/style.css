@@ -243,3 +243,6 @@ html, body {
 .account-picker-other { width:100%; margin-top:8px; padding:11px; border:1px solid #344353; border-radius:10px; background:transparent; color:var(--accent); cursor:pointer; }
 
 .channel-label{display:flex;flex-direction:column;gap:8px;color:var(--text-dim);font-size:13px}.channel-label select{width:100%;padding:12px;border-radius:10px;border:1px solid var(--border);background:var(--panel-2);color:var(--text)}.channel-info{align-self:center;max-width:420px;text-align:center;padding:18px 22px;margin:18px;border-radius:16px;background:var(--panel);color:var(--text-dim);font-size:13px}.channel-info strong{color:var(--text);font-size:17px}.channel-info p{margin:8px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}#messageInput:disabled{opacity:.7;cursor:not-allowed}
+
+/* Удаление чата с аккаунтом, которого больше нет */
+.chat-item{display:flex;align-items:center;gap:8px}.chat-item-content{flex:1;min-width:0;cursor:pointer}.remove-deleted-chat{flex:0 0 32px;width:32px;height:32px;border:1px solid var(--border);border-radius:50%;background:var(--panel-2);color:var(--text-dim);font-size:22px;line-height:1;cursor:pointer}.remove-deleted-chat:hover{color:#fff;background:#b83b45;border-color:#b83b45}.remove-deleted-chat:disabled{opacity:.5;cursor:wait}
