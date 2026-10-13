@@ -178,7 +178,7 @@
     el('markAllReadBtn').onclick=async()=>{try{for(const c of state.chats)await api('/chats/'+c.id+'/read',{method:'POST'});await loadChats();el('moreModal').classList.add('hidden')}catch(e){alert(e.message)}};
     el('muteHourBtn').onclick=()=>{state.mutedUntil=Date.now()+3600000;localStorage.setItem('nevogramMutedUntil',String(state.mutedUntil));el('muteHourBtn').textContent='✓ Звук отключён на час'};
     const search=async(inputId,resultsId)=>{const q=el(inputId).value.trim(),box=el(resultsId);if(!q){box.innerHTML='';return}try{const d=await api('/search/users?q='+encodeURIComponent(q));box.innerHTML=d.users.map(u=>'<button class="search-result" data-user="'+escapeHtml(u.username)+'"><strong>'+escapeHtml(u.name||u.username)+'</strong><small>@'+escapeHtml(u.username)+'</small></button>').join('')||'<p class="search-empty">Ничего не найдено</p>';box.querySelectorAll('[data-user]').forEach(b=>b.onclick=async()=>{try{const d=await api('/chats/direct',{method:'POST',body:{email:b.dataset.user}});el('globalSearchModal').classList.add('hidden');el('createMenuModal').classList.add('hidden');await loadChats();openChat(d.chat.id)}catch(e){alert(e.message)}})}catch(e){box.textContent=e.message}};
-    el('globalSearchInput').oninput=()=>search('globalSearchInput','globalSearchResults');
+    el('globalSearchInput').oninput=()=>{search('globalSearchInput','globalSearchResults');searchChannels('globalSearchInput','globalChannelResults')};
     el('peopleSearchInput').oninput=()=>search('peopleSearchInput','peopleSearchResults');
   }
   function renderAccountList(){
@@ -308,7 +308,7 @@
   });
   async function searchChannels(inputId, resultsId) {
     const q=el(inputId).value.trim(), box=el(resultsId);
-    if (!q) return;
+    if (!q) { box.innerHTML=''; return; }
     try {
       const d=await api('/channels/search?q='+encodeURIComponent(q));
       const html=d.channels.map(c=>'<button class="search-result" data-channel="'+escapeHtml(c.id)+'"><strong>📢 '+escapeHtml(c.title)+'</strong><small>@'+escapeHtml(c.username)+' · '+c.subscriberCount+' подписчиков</small><small>'+escapeHtml(c.description||'')+'</small><small>'+(c.isMember?'Вы подписаны':'Нажмите, чтобы подписаться')+'</small></button>').join('');
@@ -319,7 +319,6 @@
       });
     } catch(e) { box.textContent=e.message; }
   }
-  el('globalSearchInput').addEventListener('input', () => searchChannels('globalSearchInput','globalSearchResults'));
 
   // ---------- Новый личный чат ----------
   el('newDirectBtn').addEventListener('click', () => el('directModal').classList.remove('hidden'));
