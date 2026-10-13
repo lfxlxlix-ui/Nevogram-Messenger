@@ -50,7 +50,7 @@
   });
 
   async function tryResumeSession() {
-    if (!state.token) return showAuth();
+    if (!state.token) return showAccountPickerOrAuth();
     try {
       const data = await api('/me');
       state.me = data.user;
@@ -58,13 +58,45 @@
     } catch (e) {
       localStorage.removeItem('token');
       state.token = null;
-      showAuth();
+      showAccountPickerOrAuth();
     }
   }
 
-  function showAuth() {
+  function showAuth(username = '') {
     el('authScreen').classList.remove('hidden');
     el('app').classList.add('hidden');
+    const picker = el('accountPicker');
+    if (picker) picker.classList.add('hidden');
+    el('authForm').classList.remove('hidden');
+    el('usernameInput').value = username;
+    el('passwordInput').value = '';
+    el('twoFactorInput').value = '';
+    el('authError').textContent = '';
+    if (username) el('passwordInput').focus();
+  }
+
+  function showAccountPickerOrAuth() {
+    let accounts = [];
+    try { accounts = JSON.parse(localStorage.getItem('nevogramAccounts') || '[]'); } catch (_) {}
+    accounts = normalizeAccounts(accounts);
+    localStorage.setItem('nevogramAccounts', JSON.stringify(accounts));
+    el('authScreen').classList.remove('hidden');
+    el('app').classList.add('hidden');
+    if (!accounts.length) return showAuth();
+    el('authForm').classList.add('hidden');
+    el('authError').textContent = '';
+    const picker = el('accountPicker');
+    picker.classList.remove('hidden');
+    picker.innerHTML = '<h2 class="account-picker-title">Выберите аккаунт</h2>' +
+      accounts.map(a => '<button type="button" class="account-picker-option" data-account-id="' + escapeHtml(a.id) + '"><span class="account-picker-avatar">' + escapeHtml((a.name || a.username || '?').slice(0, 1).toUpperCase()) + '</span><span class="account-picker-info"><strong>' + escapeHtml(a.name || a.username) + '</strong><small>@' + escapeHtml(a.username) + '</small></span><span class="account-picker-arrow">›</span></button>').join('') +
+      '<button type="button" class="account-picker-other">Войти в другой аккаунт</button>';
+    picker.querySelectorAll('[data-account-id]').forEach(button => {
+      button.addEventListener('click', () => {
+        const account = accounts.find(a => String(a.id) === button.dataset.accountId);
+        if (account) showAuth(account.username || '');
+      });
+    });
+    picker.querySelector('.account-picker-other').addEventListener('click', () => showAuth());
   }
 
   function startApp() {
