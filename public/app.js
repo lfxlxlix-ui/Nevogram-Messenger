@@ -4,6 +4,9 @@
     me: null,
     chats: [],
     activeChat: null,
+    aiMode: false,
+    aiHistory: [],
+    aiBusy: false,
     socket: null,
     mutedUntil: Number(localStorage.getItem('nevogramMutedUntil') || 0)
   };
@@ -78,6 +81,7 @@
     connectSocket();
     loadChats();
     setupNavigation();
+    el('aiOpenBtn').onclick = openAIChat;
     if (window.location.pathname === '/settings') { loadPrivacySettings(); el('privacyModal').classList.remove('hidden'); }
   }
 
@@ -170,8 +174,59 @@
     });
   }
 
+  // ---------- Nevogram AI ----------
+  function openAIChat() {
+    state.aiMode = true;
+    state.activeChat = null;
+    state.aiHistory = [];
+    el('app').classList.add('chat-open');
+    el('emptyState').classList.add('hidden');
+    el('chatView').classList.remove('hidden');
+    el('chatTitle').textContent = '🤖 Nevogram AI';
+    el('chatSubtitle').textContent = 'ИИ-помощник · история действует в этом сеансе';
+    el('messages').innerHTML = '';
+    el('messageInput').placeholder = 'Спроси что-нибудь…';
+    appendAIMessage('assistant', 'Привет! Я Nevogram AI. Могу отвечать на вопросы, помогать с текстами и кодом. Чем помочь?');
+  }
+
+  function appendAIMessage(role, text) {
+    const div = document.createElement('div');
+    div.className = 'msg ' + (role === 'user' ? 'out' : 'in');
+    const body = document.createElement('div');
+    body.className = 'text';
+    body.textContent = text;
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    meta.textContent = formatTime(Date.now());
+    div.append(body, meta);
+    el('messages').appendChild(div);
+    scrollMessagesToBottom();
+  }
+
+  async function sendAIMessage(text) {
+    if (state.aiBusy) return;
+    state.aiBusy = true;
+    state.aiHistory.push({ role: 'user', content: text });
+    appendAIMessage('user', text);
+    const input = el('messageInput');
+    input.disabled = true;
+    try {
+      const data = await api('/ai/chat', { method: 'POST', body: { messages: state.aiHistory.slice(-12) } });
+      state.aiHistory.push({ role: 'assistant', content: data.reply });
+      appendAIMessage('assistant', data.reply);
+    } catch (err) {
+      appendAIMessage('assistant', 'Не удалось получить ответ: ' + err.message);
+    } finally {
+      state.aiBusy = false;
+      input.disabled = false;
+      input.focus();
+    }
+  }
+
   // ---------- Открытие чата ----------
   async function openChat(chatId) {
+    state.aiMode = false;
+    el('messageInput').placeholder = 'Сообщение';
     const data = await api('/chats/' + chatId + '/messages');
     state.activeChat = data.chat;
     document.getElementById('app').classList.add('chat-open');
@@ -206,7 +261,9 @@
     e.preventDefault();
     const input = el('messageInput');
     const text = input.value.trim();
-    if (!text || !state.activeChat) return;
+    if (!text) return;
+    if (state.aiMode) { input.value = ''; await sendAIMessage(text); return; }
+    if (!state.activeChat) return;
     state.socket.emit('message:send', { chatId: state.activeChat.id, text });
     input.value = '';
   });
