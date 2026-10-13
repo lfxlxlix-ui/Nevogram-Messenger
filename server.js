@@ -207,7 +207,7 @@ function chatPreview(chat, userId) {
 }
 
 app.get('/api/chats', authMiddleware, (req, res) => {
-  const myChats = state.chats.filter(c => c.memberIds.includes(req.user.id));
+  const myChats = state.chats.filter(c => c.memberIds.includes(req.user.id) && (c.type !== 'direct' || state.messages.some(m => m.chatId === c.id)));
   const list = myChats.map(c => chatPreview(c, req.user.id));
   list.sort((a, b) => (b.lastMessage?.createdAt || 0) - (a.lastMessage?.createdAt || 0));
   res.json({ chats: list });
@@ -226,9 +226,9 @@ app.post('/api/chats/direct', authMiddleware, (req, res) => {
     chat = { id: nanoid(), type: 'direct', name: null, memberIds: [req.user.id, other.id], createdAt: Date.now() };
     state.chats.push(chat);
     save();
-    // Notify both participants so the new chat appears without refreshing.
-    io.to('user:' + req.user.id).emit('chat:new');
-    io.to('user:' + other.id).emit('chat:new');
+    // Keep the new direct chat hidden until its first message is sent.
+    io.in('user:' + req.user.id).socketsJoin(chat.id);
+    io.in('user:' + other.id).socketsJoin(chat.id);
   }
   res.json({ chat: chatPreview(chat, req.user.id) });
 });
@@ -344,10 +344,14 @@ io.on('connection', (socket) => {
       createdAt: Date.now(),
       readBy: [socket.userId]
     };
+    const isFirstMessage = !state.messages.some(m => m.chatId === chatId);
     state.messages.push(msg);
     save();
     const senderName = (state.users.find(u => u.id === socket.userId) || {}).name;
     io.to(chatId).emit('message:new', { ...msg, senderName });
+    if (isFirstMessage && chat.type === 'direct') {
+      chat.memberIds.forEach(userId => io.to('user:' + userId).emit('chat:new'));
+    }
   });
 
   socket.on('typing', ({ chatId }) => {
