@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Messenger</title>
+<title>Nevogram</title>
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
@@ -12,12 +12,20 @@
   <div id="authScreen" class="auth-screen">
     <div class="auth-card">
       <div class="auth-logo">✈️</div>
-      <h1>Мессенджер</h1>
-      <p class="auth-sub">Доступ только по приглашению</p>
+      <h1>Nevogram</h1>
+      <p class="auth-sub">Общайся со своими</p>
       <form id="authForm">
-        <input id="codeInput" type="text" placeholder="Специальный код" autocomplete="off" required>
-        <input id="emailInput" type="email" placeholder="Почта" autocomplete="email" required>
-        <button type="submit">Войти</button>
+        <div id="emailStep">
+          <input id="emailInput" type="email" placeholder="Почта" autocomplete="email" required>
+          <button type="submit">Продолжить</button>
+          <p class="register-hint">Нет аккаунта? <a href="/register">Зарегистрируйтесь</a></p>
+        </div>
+        <div id="codeStep" class="hidden">
+          <p class="auth-sub">Введите 6-значный код из письма на <strong id="codeEmailLabel"></strong></p>
+          <input id="loginCodeInput" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="Код из 6 цифр" autocomplete="one-time-code">
+          <button type="button" id="verifyCodeBtn">Войти</button>
+          <button type="button" id="changeEmailBtn" class="auth-back-button">Изменить почту</button>
+        </div>
       </form>
       <div id="authError" class="auth-error"></div>
     </div>
