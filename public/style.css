@@ -195,3 +195,18 @@ html, body {
 .channel-admin-permissions{display:grid;gap:10px;margin:14px 0;padding:12px;border:1px solid var(--border,#2b3947);border-radius:12px}.channel-admin-permissions label{display:flex;align-items:center;gap:10px;font-size:14px}.channel-admin-permissions input{width:18px;height:18px;accent-color:var(--accent,#3390ec)}.channel-admin-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--border,#2b3947)}.channel-admin-row span{min-width:0;overflow-wrap:anywhere}.channel-admin-row button{flex-shrink:0}.channel-admin-row:last-child{border-bottom:0}#channelAdminSaveBtn:disabled{opacity:.5;cursor:not-allowed}
 
 .channel-action-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border,#2b3947)}.channel-action-bar button{border:1px solid var(--border,#2b3947);border-radius:9px;padding:8px 12px;background:var(--panel,#17212b);color:inherit;cursor:pointer}.channel-action-bar #voiceStatus{font-size:13px;opacity:.8}.voice-audios{display:flex;gap:6px}.voice-audios audio{max-width:180px}.message-actions{display:flex;gap:6px;margin-top:6px}.message-actions button{font-size:11px;padding:3px 7px;border:0;border-radius:6px;cursor:pointer;opacity:.8}
+
+
+/* Floating official Telegram channel announcement */
+.official-telegram-promo{position:fixed;right:24px;bottom:24px;z-index:8;width:min(370px,calc(100vw - 32px));padding:22px 20px 17px;border:1px solid #168df2;border-radius:20px;background:linear-gradient(145deg,rgba(20,37,55,.98),rgba(11,22,35,.98));box-shadow:0 14px 42px rgba(0,0,0,.38),0 0 24px rgba(22,141,242,.13);color:#eef6ff}
+.official-telegram-close{position:absolute;top:8px;right:10px;width:32px;height:32px;border:0;border-radius:9px;background:transparent;color:#8da9c5;font-size:27px;line-height:1;cursor:pointer}
+.official-telegram-close:hover{background:#263b50;color:#fff}
+.official-telegram-promo-copy{display:flex;align-items:center;gap:14px;padding-right:16px}
+.official-telegram-icon{width:54px;height:54px;flex:0 0 54px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:linear-gradient(145deg,#20a4ff,#0876df);color:white;font-size:28px;box-shadow:0 5px 18px rgba(0,136,255,.3)}
+.official-telegram-promo-copy p{margin:0;font-size:15px;font-weight:650;line-height:1.5}
+.official-telegram-button{display:flex;align-items:center;justify-content:center;min-height:46px;margin:17px 0 10px;padding:11px 16px;border-radius:13px;background:linear-gradient(90deg,#168df2,#087de5);color:white;text-align:center;text-decoration:none;font-weight:700;font-size:14px;transition:filter .15s,transform .15s}
+.official-telegram-button:hover{filter:brightness(1.1);transform:translateY(-1px)}
+.official-telegram-link{display:block;color:#70baff;text-align:center;font-size:12px;text-decoration:none;overflow-wrap:anywhere}
+.official-telegram-link:hover{text-decoration:underline}
+@media(max-width:760px){.official-telegram-promo{right:12px;bottom:calc(92px + env(safe-area-inset-bottom,0px));width:min(340px,calc(100vw - 24px));padding:17px 15px 13px;border-radius:17px}.official-telegram-icon{width:44px;height:44px;flex-basis:44px;font-size:23px}.official-telegram-promo-copy p{font-size:14px}.official-telegram-button{min-height:42px;margin-top:13px}}
+@media(max-width:360px){.official-telegram-promo{right:8px;bottom:calc(88px + env(safe-area-inset-bottom,0px));width:calc(100vw - 16px)}}
