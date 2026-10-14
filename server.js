@@ -436,6 +436,8 @@ function channelPermission(chat, userId, permission) {
   return Boolean(admin && admin.permissions && admin.permissions[permission]);
 }
 function canManageChannel(chat, userId) { return chat.ownerId === userId || channelPermission(chat, userId, 'manageAdmins'); }
+function canEditChannelMessage(chat, userId) { return chat.ownerId === userId || (chat.adminIds || []).includes(userId) || (chat.admins || []).some(a => a.userId === userId && a.permissions?.editMessages); }
+function canDeleteChannelMessage(chat, userId) { return chat.ownerId === userId || (chat.adminIds || []).includes(userId) || (chat.admins || []).some(a => a.userId === userId && a.permissions?.deleteMessages); }
 app.get('/api/channels/:id/admins', authMiddleware, (req, res) => {
   const chat = findChannel(req.params.id);
   if (!chat || !chat.memberIds.includes(req.user.id)) return res.status(404).json({ error: 'Канал не найден' });
@@ -690,7 +692,7 @@ io.on('connection', (socket) => {
       socket.emit('message:error', { error: 'Вам временно запрещено отправлять сообщения' });
       return;
     }
-    if (chat.type === 'channel' && chat.ownerId !== socket.userId && !(chat.adminIds || []).includes(socket.userId) && !(chat.admins || []).some(a => a.userId === socket.userId && a.permissions?.publishMessages)) return;
+    if (chat.type === 'channel' && !channelPermission(chat, socket.userId, 'publishMessages')) return;
     const clean = String(text || '').trim().slice(0, 4000);
     if (!clean) return;
     const msg = {
@@ -710,6 +712,60 @@ io.on('connection', (socket) => {
     if (isFirstMessage && chat.type === 'direct') {
       chat.memberIds.forEach(userId => io.to('user:' + userId).emit('chat:new'));
     }
+  });
+
+  socket.on('message:edit', ({ chatId, messageId, text }) => {
+    const chat = state.chats.find(c => c.id === chatId);
+    const msg = state.messages.find(m => m.id === messageId && m.chatId === chatId);
+    if (!chat || !msg || !chat.memberIds.includes(socket.userId)) return;
+    if (chat.type === 'channel' ? !canEditChannelMessage(chat, socket.userId) : msg.senderId !== socket.userId) {
+      socket.emit('message:error', { error: 'Нет разрешения изменять это сообщение' }); return;
+    }
+    const clean = String(text || '').trim().slice(0, 4000);
+    if (!clean) return;
+    msg.text = clean; msg.editedAt = Date.now(); save();
+    io.to(chatId).emit('message:updated', { chatId, messageId, text: msg.text, editedAt: msg.editedAt });
+  });
+
+  socket.on('message:delete', ({ chatId, messageId }) => {
+    const chat = state.chats.find(c => c.id === chatId);
+    const index = state.messages.findIndex(m => m.id === messageId && m.chatId === chatId);
+    if (!chat || index < 0 || !chat.memberIds.includes(socket.userId)) return;
+    const msg = state.messages[index];
+    if (chat.type === 'channel' ? !canDeleteChannelMessage(chat, socket.userId) : msg.senderId !== socket.userId) {
+      socket.emit('message:error', { error: 'Нет разрешения удалять это сообщение' }); return;
+    }
+    state.messages.splice(index, 1); save();
+    io.to(chatId).emit('message:deleted', { chatId, messageId });
+  });
+
+  socket.on('voice:join', ({ chatId }) => {
+    const chat = state.chats.find(c => c.id === chatId && c.type === 'channel');
+    if (!chat || !chat.memberIds.includes(socket.userId) || !channelPermission(chat, socket.userId, 'voiceChat')) {
+      socket.emit('voice:error', { error: 'Нет разрешения начинать голосовой чат' }); return;
+    }
+    const room = 'voice:' + chatId;
+    const peers = [...io.sockets.adapter.rooms.get(room) || []].filter(id => id !== socket.id);
+    socket.join(room);
+    socket.emit('voice:peers', { chatId, peers });
+    socket.to(room).emit('voice:peer-joined', { peerId: socket.id, userId: socket.userId });
+  });
+  socket.on('voice:leave', ({ chatId }) => {
+    const room = 'voice:' + chatId;
+    socket.to(room).emit('voice:peer-left', { peerId: socket.id });
+    socket.leave(room);
+  });
+  socket.on('voice:offer', ({ to, chatId, offer }) => {
+    const chat = state.chats.find(c => c.id === chatId && c.type === 'channel');
+    if (chat && chat.memberIds.includes(socket.userId) && channelPermission(chat, socket.userId, 'voiceChat')) io.to(to).emit('voice:offer', { from: socket.id, chatId, offer });
+  });
+  socket.on('voice:answer', ({ to, chatId, answer }) => {
+    const chat = state.chats.find(c => c.id === chatId && c.type === 'channel');
+    if (chat && chat.memberIds.includes(socket.userId)) io.to(to).emit('voice:answer', { from: socket.id, chatId, answer });
+  });
+  socket.on('voice:ice', ({ to, chatId, candidate }) => {
+    const chat = state.chats.find(c => c.id === chatId && c.type === 'channel');
+    if (chat && chat.memberIds.includes(socket.userId)) io.to(to).emit('voice:ice', { from: socket.id, chatId, candidate });
   });
 
   socket.on('typing', ({ chatId }) => {
