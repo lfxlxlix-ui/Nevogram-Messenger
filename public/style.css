@@ -148,3 +148,25 @@ html, body {
 .topbar { justify-content: space-between; }
 .brand-title { margin-right: auto; }
 .topbar-actions { display: flex; align-items: center; gap: 8px; }
+
+/* Clean white three-dot menu and account switcher */
+.more-menu-card{background:#fff;color:#20232a;border:1px solid #e7e9ee;border-radius:22px;padding:0;max-width:440px;max-height:min(86vh,760px);overflow:auto;box-shadow:0 24px 70px rgba(16,24,40,.22)}
+.more-menu-heading{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:22px 22px 16px}
+.more-menu-heading h3{margin:0;font-size:21px;letter-spacing:-.3px;color:#17191f}
+.more-menu-heading p{margin:5px 0 0;font-size:13px;color:#737987}
+.more-close-btn{width:34px;height:34px;flex:0 0 34px;border:0;border-radius:50%;background:#f1f3f6;color:#4b515c;font-size:25px;line-height:1;cursor:pointer}
+.more-actions{display:grid;gap:3px;padding:0 12px 12px}
+.more-action{width:100%;display:flex;align-items:center;gap:12px;text-align:left;padding:12px 10px;border:0;border-radius:13px;background:#fff;color:#20232a;cursor:pointer;transition:background .15s ease,transform .15s ease}
+.more-action:hover{background:#f5f7fa}.more-action:active{transform:scale(.99)}
+.more-action-icon{width:42px;height:42px;flex:0 0 42px;display:flex;align-items:center;justify-content:center;border-radius:13px;font-size:20px;font-weight:700}
+.read-icon{background:#e7f7ed;color:#198754}.mute-icon{background:#fff1df;color:#b96b0b}.account-icon{background:#eaf1ff;color:#3267c8}
+.more-action-copy{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1}.more-action-copy strong{font-size:14px;font-weight:650}.more-action-copy small{font-size:12px;color:#7a808b;line-height:1.35}
+.more-action-chevron{color:#a0a5af;font-size:25px;line-height:1}.more-divider{height:1px;background:#eceef2;margin:0 20px}
+.more-menu-card .account-list{padding:14px 18px 18px}.more-menu-card .account-heading{margin:0 0 10px;font-size:13px;font-weight:700;color:#7b8190}
+.more-menu-card .account-row{display:flex;align-items:center;gap:8px;padding:5px;border:1px solid #eceef2;border-radius:13px;margin:7px 0;background:#fff}
+.more-menu-card .account-option{flex:1;min-width:0;text-align:left;border:0;border-radius:9px;padding:9px 10px;background:#fff;color:#222630;font-size:14px;cursor:pointer}
+.more-menu-card .account-option small{display:block;margin-top:3px;color:#7b8190;font-size:12px}.more-menu-card .account-option:hover{background:#f6f8fb}
+.more-menu-card .remove-saved-account{width:30px;height:30px;border:0;border-radius:9px;background:#f5f6f8;color:#7b8190;font-size:20px;cursor:pointer}
+.more-menu-card .add-account-link{display:block;margin-top:10px;padding:12px;text-align:center;border:1px dashed #cfd6e1;border-radius:12px;color:#3267c8;text-decoration:none;font-weight:650}
+.more-menu-card .search-empty{color:#737987;font-size:12px}
+@media(max-width:480px){.more-menu-card{max-width:100%;border-radius:20px}.more-menu-heading{padding:18px 18px 12px}.more-menu-card .account-list{padding:12px 14px 16px}}
