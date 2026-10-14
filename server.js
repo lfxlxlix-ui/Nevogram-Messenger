@@ -47,7 +47,7 @@ app.get('/profile/:profileId', (req, res) => {
   const username = esc(user.username || user.email);
   const name = esc(user.name || user.username || user.email);
   const publicId = esc(user.publicId || state.users.indexOf(user) + 1);
-  const avatar = typeof user.avatar === 'string' && /^data:image\\/(png|jpeg|webp|gif);base64,/i.test(user.avatar) ? user.avatar : '';
+  const avatar = typeof user.avatar === 'string' && user.avatar.startsWith('data:image/') ? user.avatar : '';
   const about = esc(user.bio || user.about || 'Здесь пока ничего нет');
   const initial = esc((user.name || user.username || '?').slice(0, 1).toUpperCase());
   res.type('html').send(`<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#17212b"><title>${name} — Nevogram</title><link rel="stylesheet" href="/style.css"><style>
