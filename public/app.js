@@ -143,6 +143,14 @@
   function connectSocket() {
     state.socket = io({ auth: { token: state.token } });
 
+    state.socket.on('presence', event => {
+      state.chats.forEach(chat => { if (chat.type === 'direct' && chat.directUser && chat.directUser.id === event.userId) { chat.directUser.online = Boolean(event.online); if (event.lastSeenAt) chat.directUser.lastSeenAt = event.lastSeenAt; } });
+      if (state.activeChat && state.activeChat.type === 'direct' && state.activeChat.directUser && state.activeChat.directUser.id === event.userId) {
+        state.activeChat.directUser.online = Boolean(event.online); if (event.lastSeenAt) state.activeChat.directUser.lastSeenAt = event.lastSeenAt;
+        el('chatSubtitle').textContent = directUserStatus(state.activeChat.directUser);
+      }
+    });
+
     state.socket.on('chat:new', () => {
       loadChats().catch(() => {});
     });
@@ -292,6 +300,35 @@
     });
   }
 
+  function formatLastSeen(timestamp) {
+    if (!timestamp) return 'давно не был(а) в сети';
+    const date = new Date(timestamp);
+    if (Number.isNaN(date.getTime())) return 'давно не был(а) в сети';
+    const now = new Date();
+    const time = date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    if (date.toDateString() === now.toDateString()) return 'был(а) в сети сегодня в ' + time;
+    const yesterday = new Date(now); yesterday.setDate(now.getDate()-1);
+    if (date.toDateString() === yesterday.toDateString()) return 'был(а) в сети вчера в ' + time;
+    return 'был(а) в сети ' + date.toLocaleDateString('ru-RU', { day:'numeric', month:'short' }) + ' в ' + time;
+  }
+  function directUserStatus(user) { return user ? (user.online ? 'в сети' : formatLastSeen(user.lastSeenAt)) : 'Пользователь'; }
+  function renderChatHeader(chat) {
+    const user = chat && chat.type === 'direct' ? chat.directUser : null;
+    el('chatTitle').textContent = chat ? chat.title : '';
+    const avatar = el('chatAvatar');
+    if (user && user.avatar) avatar.innerHTML = '<img src="' + escapeHtml(user.avatar) + '" alt="">';
+    else avatar.textContent = chat && chat.type === 'channel' ? '📢' : (chat && chat.title ? chat.title.slice(0,1).toUpperCase() : '');
+    avatar.style.display = chat && (chat.type === 'direct' || chat.type === 'channel') ? 'flex' : 'none';
+  }
+
+  el('chatBackBtn').addEventListener('click', () => {
+    document.getElementById('app').classList.remove('chat-open');
+    el('chatView').classList.add('hidden');
+    el('emptyState').classList.remove('hidden');
+    state.activeChat = null;
+    renderChatList();
+  });
+
   // ---------- Открытие чата ----------
   async function openChat(chatId) {
     el('messageInput').placeholder = 'Сообщение';
@@ -300,8 +337,8 @@
     document.getElementById('app').classList.add('chat-open');
     el('emptyState').classList.add('hidden');
     el('chatView').classList.remove('hidden');
-    el('chatTitle').textContent = data.chat.title;
-    el('chatSubtitle').textContent = data.chat.type === 'channel' ? ((data.chat.username ? '@'+data.chat.username+' · ' : '') + (data.chat.subscriberCount || 1) + ' подписчиков') : '';
+    renderChatHeader(data.chat);
+    el('chatSubtitle').textContent = data.chat.type === 'channel' ? ((data.chat.username ? '@'+data.chat.username+' · ' : '') + (data.chat.subscriberCount || 1) + ' подписчиков') : (data.chat.type === 'direct' ? directUserStatus(data.chat.directUser) : '');
     el('messageInput').disabled = data.chat.type === 'channel' && !data.chat.canPost;
     el('messageInput').placeholder = data.chat.type === 'channel' && !data.chat.canPost ? 'Публиковать могут только администраторы' : 'Сообщение';
     el('messages').innerHTML = '';
