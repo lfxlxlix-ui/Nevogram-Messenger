@@ -132,7 +132,7 @@ app.post('/api/register', async (req, res) => {
   if (!/^[a-z0-9_]{3,24}$/.test(username)) return res.status(400).json({ error: 'Логин: 3–24 символа, только латинские буквы, цифры и _' });
   if (password.length < 8 || Buffer.byteLength(password, 'utf8') > 72) return res.status(400).json({ error: 'Пароль должен быть не короче 8 символов и не длиннее 72 байт' });
   if (!code) return res.status(400).json({ error: 'Введите бета-код приглашения' });
-  if (state.users.some(u => (u.username || u.email || '').toLowerCase() === username)) return res.status(409).json({ error: 'Этот логин уже занят' });
+  if (state.users.some(u => String(u.username || u.email || '').trim().replace(/^@+/, '').toLowerCase() === username)) return res.status(409).json({ error: 'Этот username уже занят другим аккаунтом' });
   const invite = state.invites.find(inv => !inv.used && bcrypt.compareSync(code, inv.codeHash));
   if (!invite) return res.status(401).json({ error: 'Бета-код недействителен или уже использован' });
   const nextPublicId = state.users.reduce((max, u, index) => Math.max(max, Number(u.publicId) || index + 1), 0) + 1;
@@ -176,7 +176,7 @@ app.put('/api/me/profile', authMiddleware, (req, res) => {
   if (!firstName) return res.status(400).json({ error: 'Введите имя' });
   if (firstName.length > 40 || lastName.length > 40) return res.status(400).json({ error: 'Имя и фамилия должны быть не длиннее 40 символов' });
   if (username && !/^[a-z0-9_]{3,32}$/.test(username)) return res.status(400).json({ error: 'Username должен содержать 3–32 символа: латиницу, цифры или _' });
-  if (username && state.users.some(u => u.id !== req.user.id && String(u.username || '').toLowerCase() === username)) return res.status(409).json({ error: 'Этот username уже занят' });
+  if (username && state.users.some(u => u.id !== req.user.id && String(u.username || u.email || '').trim().replace(/^@+/, '').toLowerCase() === username)) return res.status(409).json({ error: 'Этот username уже занят другим аккаунтом' });
   if (avatar && (!avatar.startsWith('data:image/jpeg;base64,') || avatar.length > 1500000)) return res.status(400).json({ error: 'Фото профиля не подходит или слишком большое' });
   if (banner && (!/^data:(image\/(jpeg|png|webp|gif)|video\/(mp4|webm|quicktime));base64,/.test(banner) || banner.length > 8500000)) return res.status(400).json({ error: 'Баннер должен быть фото или видео до 6 МБ' });
   if (birthday && !/^\d{4}-\d{2}-\d{2}$/.test(birthday)) return res.status(400).json({ error: 'Укажите корректную дату рождения' });
