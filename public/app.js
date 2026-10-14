@@ -164,6 +164,32 @@
       loadChats();
     });
 
+    state.socket.on('message:updated', ({ chatId, messageId, text, editedAt }) => {
+      if (!state.activeChat || state.activeChat.id !== chatId) return;
+      const node = el('messages').querySelector('[data-message-id="' + CSS.escape(messageId) + '"]');
+      if (node) { node.querySelector('.text').textContent = text; const meta=node.querySelector('.meta'); if(meta) meta.textContent = formatTime(editedAt) + ' · изменено'; }
+    });
+    state.socket.on('message:deleted', ({ chatId, messageId }) => {
+      if (state.activeChat && state.activeChat.id === chatId) el('messages').querySelector('[data-message-id="' + CSS.escape(messageId) + '"]')?.remove();
+    });
+    state.socket.on('message:error', ({ error }) => alert(error || 'Не удалось выполнить действие'));
+    state.socket.on('voice:error', ({ error }) => { el('voiceStatus').textContent = error || 'Ошибка голосового чата'; });
+    state.socket.on('voice:started', ({ chatId }) => { if (state.activeChat?.id === chatId) el('voiceStatus').textContent = 'Голосовой чат активен'; });
+    state.socket.on('voice:stopped', ({ chatId }) => { if (state.activeChat?.id === chatId) { leaveVoiceLocal(); el('voiceStatus').textContent = 'Голосовой чат завершён'; } });
+    state.socket.on('voice:peer-joined', async ({ peerId }) => { if (voiceChatId && voiceChatId === state.activeChat?.id) await createVoiceOffer(peerId); });
+    state.socket.on('voice:peers', async ({ chatId, peers }) => { if (voiceChatId === chatId) for (const peerId of peers) await createVoiceOffer(peerId); });
+    state.socket.on('voice:offer', async ({ from, chatId, offer }) => {
+      if (!voiceChatId || voiceChatId !== chatId) return;
+      try {
+        const pc = getVoicePeer(from); await pc.setRemoteDescription(offer);
+        const answer = await pc.createAnswer(); await pc.setLocalDescription(answer);
+        state.socket.emit('voice:answer', { to: from, chatId, answer: pc.localDescription });
+      } catch (e) { el('voiceStatus').textContent = 'Не удалось подключить участника: ' + e.message; }
+    });
+    state.socket.on('voice:answer', async ({ from, chatId, answer }) => { if (voiceChatId !== chatId) return; const pc=voicePeers.get(from); if(pc) try { await pc.setRemoteDescription(answer); } catch(_) {} });
+    state.socket.on('voice:ice', async ({ from, chatId, candidate }) => { if (voiceChatId !== chatId) return; const pc=voicePeers.get(from); if(pc && candidate) try { await pc.addIceCandidate(candidate); } catch(_) {} });
+    state.socket.on('voice:peer-left', ({ peerId }) => closeVoicePeer(peerId));
+
     state.socket.on('read', ({ chatId }) => {
       if (state.activeChat && chatId === state.activeChat.id) {
         document.querySelectorAll('.msg.out .meta').forEach(m => { m.textContent = m.textContent.replace('✓', '✓✓'); });
@@ -329,7 +355,63 @@
     if (user && user.avatar) avatar.innerHTML = '<img src="' + escapeHtml(user.avatar) + '" alt="">';
     else avatar.textContent = chat && chat.type === 'channel' ? '📢' : (chat && chat.title ? chat.title.slice(0,1).toUpperCase() : '');
     avatar.style.display = chat && (chat.type === 'direct' || chat.type === 'channel') ? 'flex' : 'none';
+    const bar = el('channelActionBar');
+    if (bar) {
+      bar.classList.toggle('hidden', !chat || chat.type !== 'channel');
+      if (chat && chat.type === 'channel') {
+        el('channelAdminsOpenBtn').classList.toggle('hidden', !(chat.isOwner || chat.isAdmin || chat.adminPermissions?.manageAdmins));
+        el('voiceStartBtn').classList.toggle('hidden', !(chat.isOwner || chat.adminPermissions?.voiceChat));
+        el('voiceLeaveBtn').classList.add('hidden');
+        el('voiceStatus').textContent = '';
+      }
+    }
   }
+
+  let voiceChatId = null;
+  let voiceStream = null;
+  const voicePeers = new Map();
+  async function startVoiceChat() {
+    const chat = state.activeChat;
+    if (!chat || chat.type !== 'channel' || !state.socket) return;
+    try {
+      voiceStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      voiceChatId = chat.id;
+      el('voiceStartBtn').classList.add('hidden');
+      el('voiceLeaveBtn').classList.remove('hidden');
+      el('voiceStatus').textContent = 'Подключение к голосовому чату…';
+      state.socket.emit('voice:start', { chatId: chat.id });
+    } catch (e) { el('voiceStatus').textContent = 'Нет доступа к микрофону: ' + e.message; }
+  }
+  async function joinVoiceChat() {
+    const chat=state.activeChat;if(!chat||chat.type!=='channel')return;
+    try { voiceStream=await navigator.mediaDevices.getUserMedia({audio:true,video:false}); voiceChatId=chat.id;el('voiceStartBtn').classList.add('hidden');el('voiceLeaveBtn').classList.remove('hidden');el('voiceStatus').textContent='Подключение…';state.socket.emit('voice:join',{chatId:chat.id}); }
+    catch(e){el('voiceStatus').textContent='Нет доступа к микрофону: '+e.message;}
+  }
+  function getVoicePeer(peerId) {
+    if (voicePeers.has(peerId)) return voicePeers.get(peerId);
+    const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+    voicePeers.set(peerId, pc);
+    if (voiceStream) voiceStream.getTracks().forEach(track => pc.addTrack(track, voiceStream));
+    pc.onicecandidate = e => { if(e.candidate && voiceChatId) state.socket.emit('voice:ice',{to:peerId,chatId:voiceChatId,candidate:e.candidate}); };
+    pc.ontrack = e => { let audio=el('voiceAudios').querySelector('[data-peer="'+CSS.escape(peerId)+'"]'); if(!audio){audio=document.createElement('audio');audio.autoplay=true;audio.dataset.peer=peerId;el('voiceAudios').appendChild(audio);} audio.srcObject=e.streams[0]; };
+    pc.onconnectionstatechange = () => { if(['failed','closed','disconnected'].includes(pc.connectionState)) closeVoicePeer(peerId); };
+    return pc;
+  }
+  async function createVoiceOffer(peerId) {
+    try { const pc=getVoicePeer(peerId); const offer=await pc.createOffer(); await pc.setLocalDescription(offer); state.socket.emit('voice:offer',{to:peerId,chatId:voiceChatId,offer:pc.localDescription}); } catch(e){ console.warn('Voice offer failed',e); }
+  }
+  function closeVoicePeer(peerId) { const pc=voicePeers.get(peerId); if(pc){pc.close();voicePeers.delete(peerId);} const audio=el('voiceAudios').querySelector('[data-peer="'+CSS.escape(peerId)+'"]');if(audio)audio.remove(); }
+  function leaveVoiceLocal() {
+    if(voiceChatId && state.socket) state.socket.emit('voice:leave',{chatId:voiceChatId});
+    voicePeers.forEach((pc,id)=>{pc.close();});voicePeers.clear();
+    if(voiceStream) voiceStream.getTracks().forEach(t=>t.stop());voiceStream=null;
+    el('voiceAudios').innerHTML='';el('voiceLeaveBtn').classList.add('hidden');
+    const chat=state.activeChat;el('voiceStartBtn').classList.toggle('hidden',!(chat && (chat.isOwner || chat.adminPermissions?.voiceChat)));
+    voiceChatId=null;
+  }
+  el('channelAdminsOpenBtn').addEventListener('click',()=>{if(state.activeChat)openChannelAdmins(state.activeChat);});
+  el('voiceStartBtn').addEventListener('click',startVoiceChat);
+  el('voiceLeaveBtn').addEventListener('click',()=>{if(voiceChatId)state.socket.emit('voice:stop',{chatId:voiceChatId});leaveVoiceLocal();});
 
   async function openChannelAdmins(chat) {
     el('channelAdminsError').textContent = '';
@@ -428,10 +510,29 @@
     const mine = msg.senderId === state.me.id;
     const div = document.createElement('div');
     div.className = 'msg ' + (mine ? 'out' : 'in');
+    div.dataset.messageId = msg.id;
+    const canEdit = state.activeChat && state.activeChat.type === 'channel' && (state.activeChat.isOwner || state.activeChat.adminPermissions?.editMessages);
+    const canDelete = state.activeChat && state.activeChat.type === 'channel' && (state.activeChat.isOwner || state.activeChat.adminPermissions?.deleteMessages);
     div.innerHTML = `
       ${!mine && state.activeChat && state.activeChat.type === 'group' ? `<div class="sender">${escapeHtml(msg.senderName)}</div>` : ''}
       <div class="text">${escapeHtml(msg.text)}</div>
-      <div class="meta">${formatTime(msg.createdAt)}${mine ? ' ✓' : ''}</div>`;
+      <div class="meta">${formatTime(msg.createdAt)}${msg.editedAt ? ' · изменено' : ''}${mine ? ' ✓' : ''}</div>
+      ${(mine || canEdit || canDelete) ? '<div class="message-actions"></div>' : ''}`;
+    const actions = div.querySelector('.message-actions');
+    if (actions) {
+      if (mine || canEdit) {
+        const edit = document.createElement('button'); edit.type='button'; edit.textContent='Изменить';
+        edit.addEventListener('click', () => {
+          const next = prompt('Изменить сообщение', msg.text);
+          if (next !== null && next.trim()) state.socket.emit('message:edit', { chatId: state.activeChat.id, messageId: msg.id, text: next.trim() });
+        }); actions.appendChild(edit);
+      }
+      if (mine || canDelete) {
+        const del = document.createElement('button'); del.type='button'; del.textContent='Удалить';
+        del.addEventListener('click', () => { if (confirm('Удалить это сообщение?')) state.socket.emit('message:delete', { chatId: state.activeChat.id, messageId: msg.id }); });
+        actions.appendChild(del);
+      }
+    }
     el('messages').appendChild(div);
   }
 
