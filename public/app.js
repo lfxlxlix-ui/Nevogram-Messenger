@@ -1,6 +1,6 @@
 (() => {
   // Keep authentication only for this browser tab/session; never persist the token across browser sessions.
-  sessionStorage.removeItem('token');
+  localStorage.removeItem('token');
   const state = {
     token: sessionStorage.getItem('token') || null,
     me: null,
