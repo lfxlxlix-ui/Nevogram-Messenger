@@ -15,7 +15,8 @@ const app = express();
 app.use(express.json({ limit: '12mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.get(['/register', '/cananr'], (req, res) => res.sendFile(path.join(__dirname, 'public', 'register.html')));
-app.get(['/login', '/cananl', '/home', '/chats', '/settings'], (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+app.get('/settings', (req, res) => res.sendFile(path.join(__dirname, 'public', 'settings.html')));
+app.get(['/login', '/cananl', '/home', '/chats'], (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 app.get(['/cp', '/editprofile'], (req, res) => {
   res.type('html').send(`<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#17212b"><title>Редактировать профиль — Nevogram</title><link rel="stylesheet" href="/style.css"><style>
