@@ -211,15 +211,18 @@ function chatPreview(chat, userId) {
   const last = msgs[msgs.length - 1] || null;
   const unread = msgs.filter(m => m.senderId !== userId && !m.readBy.includes(userId)).length;
   let title = chat.name;
+  let directUser = null;
   if (chat.type === 'direct') {
     const otherId = chat.memberIds.find(id => id !== userId);
     const other = state.users.find(u => u.id === otherId);
     title = other ? other.name : 'Удалённый пользователь';
+    if (other) directUser = { id: other.id, name: other.name || other.username || 'Пользователь', avatar: typeof other.avatar === 'string' && other.avatar.startsWith('data:image/') ? other.avatar : '', online: Boolean(onlineUsers.get(other.id)?.size), lastSeenAt: other.lastSeenAt || null };
   }
   return {
     id: chat.id,
     type: chat.type,
     title,
+    ...(directUser ? { directUser } : {}),
     lastMessage: last ? { text: last.text, createdAt: last.createdAt, senderId: last.senderId } : null,
     unread,
     ...(chat.type === 'channel' ? { username: chat.username || null, description: chat.description || '', isPublic: Boolean(chat.isPublic), ownerId: chat.ownerId, subscriberCount: chat.memberIds.length, canPost: chat.ownerId === userId || (chat.adminIds || []).includes(userId) } : {})
@@ -671,7 +674,9 @@ io.on('connection', (socket) => {
       set.delete(socket.id);
       if (set.size === 0) {
         onlineUsers.delete(socket.userId);
-        socket.broadcast.emit('presence', { userId: socket.userId, online: false });
+        const disconnectedUser = state.users.find(u => u.id === socket.userId);
+        if (disconnectedUser) { disconnectedUser.lastSeenAt = Date.now(); save(); }
+        socket.broadcast.emit('presence', { userId: socket.userId, online: false, lastSeenAt: disconnectedUser?.lastSeenAt || Date.now() });
       }
     }
   });
