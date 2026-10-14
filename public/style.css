@@ -190,3 +190,6 @@ html, body {
 .compose-modal-card .btn-primary{min-height:42px;padding:10px 18px;border-radius:11px;background:#3388d8;color:white;font-weight:700}
 .compose-modal-card .modal-error{margin-top:2px;line-height:1.4}
 @media(max-width:480px){.compose-modal-card{padding:18px;border-radius:18px}.compose-modal-heading h3{font-size:19px}.modal-close-btn{width:34px;height:34px;flex-basis:34px}}
+
+/* Channel administrator permissions */
+.channel-admin-permissions{display:grid;gap:10px;margin:14px 0;padding:12px;border:1px solid var(--border,#2b3947);border-radius:12px}.channel-admin-permissions label{display:flex;align-items:center;gap:10px;font-size:14px}.channel-admin-permissions input{width:18px;height:18px;accent-color:var(--accent,#3390ec)}.channel-admin-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--border,#2b3947)}.channel-admin-row span{min-width:0;overflow-wrap:anywhere}.channel-admin-row button{flex-shrink:0}.channel-admin-row:last-child{border-bottom:0}#channelAdminSaveBtn:disabled{opacity:.5;cursor:not-allowed}
