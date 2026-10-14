@@ -60,11 +60,11 @@ app.get('/profile/:profileId', (req, res) => {
 });
 
 app.get('/admin', (req, res) => {
-  res.type('html').send(`<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0e1621"><title>Админ-панель — Nevogram</title><link rel="stylesheet" href="/style.css"></head><body><main class="auth-screen"><section class="auth-card" style="max-width:680px"><div class="auth-logo">✈️</div><h1>Nevogram Admin</h1><p class="auth-sub">Управление бета-приглашениями и пользователями</p><form id="adminLogin"><input id="adminPassword" type="password" placeholder="Пароль администратора" autocomplete="current-password" required><button>Войти</button></form><div id="adminError" class="auth-error"></div><section id="adminPanel" hidden><button id="createInvite" type="button">Создать бета-код</button><p id="newInvite"></p><h2>Приглашения</h2><div id="invites"></div><h2>Пользователи</h2><div id="users"></div></section><p class="register-hint"><a href="/home">Открыть мессенджер</a></p></section></main><script>
+  res.type('html').send(`<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0e1621"><title>Админ-панель — Nevogram</title><link rel="stylesheet" href="/style.css"></head><body><main class="auth-screen"><section class="auth-card" style="max-width:680px"><div class="auth-logo">✈️</div><h1>Nevogram Admin</h1><p class="auth-sub">Управление бета-приглашениями и пользователями</p><form id="adminLogin"><input id="adminPassword" type="password" placeholder="Пароль администратора" autocomplete="current-password" required><button>Войти</button></form><div id="adminError" class="auth-error"></div><section id="adminPanel" hidden><button id="createInvite" type="button">Создать бета-код</button><p id="newInvite"></p><h2>Приглашения</h2><div id="invites"></div><h2>Пользователи</h2><div id="users"></div><h2>Заявки на верификацию</h2><div id="verificationRequests"></div></section><p class="register-hint"><a href="/home">Открыть мессенджер</a></p></section></main><script>
 let adminToken= sessionStorage.getItem('nevogramAdminToken')||'';
 const err=document.getElementById('adminError');
 async function call(path,method='GET',body){const r=await fetch('/api/admin'+path,{method,headers:{'Content-Type':'application/json',...(adminToken?{Authorization:'Bearer '+adminToken}:{})},...(body!==undefined?{body:JSON.stringify(body)}:{})});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'Ошибка запроса');return d;}
-async function refresh(){const [i,u]=await Promise.all([call('/invites'),call('/users')]);document.getElementById('invites').innerHTML=i.invites.map(v=>'<p>'+(v.used?'':'<button type="button" data-delete-invite="'+v.id+'" style="margin-right:8px;background:#fff;color:#d11;border:1px solid #d11">Удалить</button>')+v.codePreview+' · '+(v.used?'использован':'не использован')+'</p>').join('')||'<p>Пока нет кодов</p>';document.querySelectorAll('[data-delete-invite]').forEach(btn=>btn.addEventListener('click',async()=>{if(btn.dataset.confirm!=='yes'){btn.dataset.confirm='yes';btn.textContent='точно?';btn.style.background='#fff';btn.style.color='#d11';btn.style.border='1px solid #d11';return;}try{await call('/invites/'+encodeURIComponent(btn.dataset.deleteInvite),'DELETE');await refresh();}catch(e){err.textContent=e.message;}}));document.getElementById('users').innerHTML=u.users.map(v=>'<label style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #263746"><input type="checkbox" data-verify-user="'+v.id+'" '+(v.verified?'checked':'')+' style="width:auto;margin:0"><span>@'+String(v.name||v.email).replace(/[&<>\"]/g,'')+'</span><small style="color:#72b5f8">'+(v.verified?'✓ подтверждён':'')+'</small></label>').join('')||'<p>Пока нет пользователей</p>';document.querySelectorAll('[data-verify-user]').forEach(box=>box.addEventListener('change',async()=>{box.disabled=true;try{await call('/users/'+encodeURIComponent(box.dataset.verifyUser)+'/verification','PATCH',{verified:box.checked});await refresh();}catch(e){err.textContent=e.message;box.checked=!box.checked;box.disabled=false;}}));}
+async function refresh(){const [i,u,v]=await Promise.all([call('/invites'),call('/users'),call('/verification-requests')]);document.getElementById('invites').innerHTML=i.invites.map(v=>'<p>'+(v.used?'':'<button type="button" data-delete-invite="'+v.id+'" style="margin-right:8px;background:#fff;color:#d11;border:1px solid #d11">Удалить</button>')+v.codePreview+' · '+(v.used?'использован':'не использован')+'</p>').join('')||'<p>Пока нет кодов</p>';document.querySelectorAll('[data-delete-invite]').forEach(btn=>btn.addEventListener('click',async()=>{if(btn.dataset.confirm!=='yes'){btn.dataset.confirm='yes';btn.textContent='точно?';btn.style.background='#fff';btn.style.color='#d11';btn.style.border='1px solid #d11';return;}try{await call('/invites/'+encodeURIComponent(btn.dataset.deleteInvite),'DELETE');await refresh();}catch(e){err.textContent=e.message;}}));document.getElementById('users').innerHTML=u.users.map(v=>'<label style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #263746"><input type="checkbox" data-verify-user="'+v.id+'" '+(v.verified?'checked':'')+' style="width:auto;margin:0"><span>@'+String(v.name||v.email).replace(/[&<>\"]/g,'')+'</span><small style="color:#72b5f8">'+(v.verified?'✓ подтверждён':'')+'</small></label>').join('')||'<p>Пока нет пользователей</p>';document.querySelectorAll('[data-verify-user]').forEach(box=>box.addEventListener('change',async()=>{box.disabled=true;try{await call('/users/'+encodeURIComponent(box.dataset.verifyUser)+'/verification','PATCH',{verified:box.checked});await refresh();}catch(e){err.textContent=e.message;box.checked=!box.checked;box.disabled=false;}}));document.getElementById('verificationRequests').innerHTML=v.requests.map(r=>'<article style="border:1px solid #2a3c4d;border-radius:12px;padding:12px;margin:10px 0"><b>@'+String(r.username).replace(/[&<>\"]/g,'')+'</b> · '+(r.status==='pending'?'На рассмотрении':r.status==='approved'?'Одобрена':'Отклонена')+'<p>Соцсеть: '+String(r.network).replace(/[&<>\"]/g,'')+' · ник: '+String(r.socialUsername).replace(/[&<>\"]/g,'')+'</p><p>Подписчики: '+String(r.followers).replace(/[&<>\"]/g,'')+'</p><p>Зачем нужна верификация: '+String(r.reason).replace(/[&<>\"]/g,'')+'</p><p>Доказательство: '+String(r.proof).replace(/[&<>\"]/g,'')+'</p>'+(r.status==='pending'?'<button type="button" data-request-decision="approved" data-request-id="'+r.id+'">Одобрить</button> <button type="button" data-request-decision="rejected" data-request-id="'+r.id+'">Отклонить</button>':'')+'</article>').join('')||'<p>Заявок пока нет.</p>';document.querySelectorAll('[data-request-decision]').forEach(btn=>btn.addEventListener('click',async()=>{btn.disabled=true;try{await call('/verification-requests/'+encodeURIComponent(btn.dataset.requestId),'PATCH',{decision:btn.dataset.requestDecision});await refresh();}catch(e){err.textContent=e.message;btn.disabled=false;}}));}}
 document.getElementById('adminLogin').addEventListener('submit',async e=>{e.preventDefault();err.textContent='';try{const r=await fetch('/api/admin/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:document.getElementById('adminPassword').value})});const d=await r.json();if(!r.ok)throw new Error(d.error||'Ошибка входа');adminToken=d.token;sessionStorage.setItem('nevogramAdminToken',adminToken);document.getElementById('adminPanel').hidden=false;document.getElementById('adminPassword').value='';await refresh();}catch(e){err.textContent=e.message;}});
 document.getElementById('createInvite').addEventListener('click',async()=>{try{const d=await call('/invites','POST');document.getElementById('newInvite').textContent='Новый код (сохраните сейчас, он показывается один раз): '+d.code;await refresh();}catch(e){err.textContent=e.message;}});
 if(adminToken){document.getElementById('adminPanel').hidden=false;refresh().catch(e=>{sessionStorage.removeItem('nevogramAdminToken');adminToken='';err.textContent=e.message;document.getElementById('adminPanel').hidden=true;});}
@@ -414,7 +414,8 @@ app.patch('/api/channels/:id', authMiddleware, (req, res) => {
   res.json({ channel: channelPublicInfo(chat, req.user.id) });
 });
 
-// ---------- Админка: инвайт-коды и пользователи ----------
+// ---------- Админка: инвайт-коды, пользователи и заявки на верификацию ----------
+if (!Array.isArray(state.verificationRequests)) state.verificationRequests = [];
 // Админ НЕ имеет доступа к переписке людей — только управляет кодами приглашений и видит список аккаунтов.
 app.post('/api/admin/login', (req, res) => {
   const { password } = req.body || {};
@@ -449,6 +450,51 @@ app.get('/api/admin/invites', adminMiddleware, (req, res) => {
     createdAt: inv.createdAt
   }));
   res.json({ invites: list });
+});
+
+app.post('/api/me/verification-request', authMiddleware, (req, res) => {
+  if (!Array.isArray(state.verificationRequests)) state.verificationRequests = [];
+  const existing = state.verificationRequests.find(r => r.userId === req.user.id && r.status === 'pending');
+  if (existing) return res.status(409).json({ error: 'У вас уже есть заявка на рассмотрении.' });
+  const body = req.body || {};
+  const network = String(body.network || '').trim().slice(0, 40);
+  const socialUsername = String(body.socialUsername || '').trim().slice(0, 100);
+  const followers = String(body.followers || '').trim().slice(0, 40);
+  const reason = String(body.reason || '').trim().slice(0, 1000);
+  const proof = String(body.proof || '').trim().slice(0, 1500);
+  if (!network || !socialUsername || !followers || !reason || !proof) return res.status(400).json({ error: 'Заполните все поля заявки.' });
+  const request = { id: nanoid(), userId: req.user.id, network, socialUsername, followers, reason, proof, status: 'pending', createdAt: Date.now() };
+  state.verificationRequests.push(request); save();
+  res.status(201).json({ ok: true, request: { id: request.id, status: request.status } });
+});
+
+app.get('/api/me/verification-request', authMiddleware, (req, res) => {
+  const requests = (state.verificationRequests || []).filter(r => r.userId === req.user.id).sort((a,b) => b.createdAt-a.createdAt);
+  res.json({ requests: requests.map(r => ({ id:r.id, network:r.network, socialUsername:r.socialUsername, followers:r.followers, reason:r.reason, proof:r.proof, status:r.status, createdAt:r.createdAt, reviewedAt:r.reviewedAt || null, adminNote:r.adminNote || '' })) });
+});
+
+app.get('/api/admin/verification-requests', adminMiddleware, (req, res) => {
+  const requests = (state.verificationRequests || []).slice().sort((a,b) => b.createdAt-a.createdAt).map(r => {
+    const user = state.users.find(u => u.id === r.userId);
+    return { ...r, username: user ? (user.username || user.email) : 'удалённый аккаунт', userName: user ? user.name : '' };
+  });
+  res.json({ requests });
+});
+
+app.patch('/api/admin/verification-requests/:id', adminMiddleware, (req, res) => {
+  const request = (state.verificationRequests || []).find(r => r.id === req.params.id);
+  if (!request) return res.status(404).json({ error: 'Заявка не найдена.' });
+  if (request.status !== 'pending') return res.status(409).json({ error: 'Эта заявка уже рассмотрена.' });
+  const decision = String((req.body || {}).decision || '');
+  if (!['approved', 'rejected'].includes(decision)) return res.status(400).json({ error: 'Укажите решение.' });
+  const user = state.users.find(u => u.id === request.userId);
+  if (decision === 'approved' && !user) return res.status(404).json({ error: 'Аккаунт пользователя не найден.' });
+  request.status = decision;
+  request.reviewedAt = Date.now();
+  request.adminNote = String((req.body || {}).note || '').trim().slice(0, 500);
+  if (user) { user.verified = decision === 'approved'; user.verifiedAt = user.verified ? Date.now() : null; }
+  save();
+  res.json({ ok: true, status: request.status });
 });
 
 app.get('/api/admin/users', adminMiddleware, (req, res) => {
