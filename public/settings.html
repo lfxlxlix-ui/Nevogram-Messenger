@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Настройки — Nevogram</title><link rel="stylesheet" href="/style.css">
+<style>
+.settings-page{min-height:100vh;padding:20px 16px 40px;background:var(--bg,#101820);color:var(--text,#fff)}
+.settings-wrap{max-width:680px;margin:0 auto}.settings-top{display:flex;align-items:center;gap:14px;margin-bottom:22px}
+.settings-back{display:inline-flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:50%;background:var(--panel,#202b36);color:inherit;text-decoration:none;font-size:28px}
+.settings-card{background:var(--panel,#202b36);border-radius:18px;padding:18px;margin:12px 0}
+.settings-card h2{font-size:17px;margin:0 0 14px}.settings-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 0;border-bottom:1px solid #ffffff18}.settings-row:last-child{border-bottom:0}
+.settings-row select,.settings-card input[type=password]{max-width:58%;padding:10px;border-radius:10px;border:1px solid #ffffff30;background:var(--bg,#101820);color:inherit}
+.settings-card input[type=password]{display:block;max-width:none;width:100%;box-sizing:border-box;margin:10px 0}
+.settings-note{opacity:.72;font-size:13px;line-height:1.5}.settings-status{font-size:14px;margin:10px 0;overflow-wrap:anywhere}
+</style></head>
+<body><main class="settings-page"><div class="settings-wrap">
+<header class="settings-top"><a class="settings-back" href="/chats" aria-label="Назад">‹</a><div><h1 style="margin:0;font-size:24px">Настройки</h1><div id="accountLabel" class="settings-note">Nevogram</div></div></header>
+<section class="settings-card"><h2>Безопасность аккаунта</h2>
+<label class="settings-row"><span>Двухфакторная защита</span><input id="twoFactorEnabledInput" type="checkbox"></label>
+<input id="securityCodeInput" type="password" inputmode="numeric" placeholder="Секретный код (6–12 цифр)">
+<input id="securityPasswordInput" type="password" autocomplete="current-password" placeholder="Текущий пароль для подтверждения">
+<button class="btn-primary" id="securitySaveBtn" type="button">Сохранить защиту</button><p id="securityStatus" class="settings-status" role="status"></p>
+</section>
+<section class="settings-card"><h2>Кто может видеть мои данные</h2>
+<label class="settings-row"><span>Логин</span><select data-privacy="email"><option>Все</option><option>Контакты</option><option>Никто</option></select></label>
+<label class="settings-row"><span>Время последнего захода</span><select data-privacy="online"><option>Все</option><option>Контакты</option><option>Никто</option></select></label>
+<label class="settings-row"><span>Фотография профиля</span><select data-privacy="avatar"><option>Все</option><option>Контакты</option><option>Никто</option></select></label>
+</section>
+<section class="settings-card"><h2>Кто может связываться со мной</h2>
+<label class="settings-row"><span>Писать мне</span><select data-privacy="messages"><option>Все</option><option>Контакты</option></select></label>
+<label class="settings-row"><span>Добавлять в группы</span><select data-privacy="groups"><option>Все</option><option>Контакты</option><option>Никто</option></select></label>
+<label class="settings-row"><span>Приглашать в каналы</span><select data-privacy="channels"><option>Все</option><option>Контакты</option><option>Никто</option></select></label>
+<label class="settings-row"><span>Находить по юзернейму</span><select data-privacy="username"><option>Все</option><option>Никто</option></select></label>
+<p class="settings-note">Настройки конфиденциальности сохраняются в этом браузере. Ограничения пока не применяются сервером к перепискам и приглашениям.</p>
+<button class="btn-primary" id="privacySaveBtn" type="button">Сохранить настройки</button><p id="privacyStatus" class="settings-status" role="status"></p>
+</section>
+</div></main>
+<script>
+(async()=>{
+const $=id=>document.getElementById(id), token=localStorage.getItem('token');
+if(!token){$('accountLabel').textContent='Войдите в аккаунт, чтобы управлять настройками.'; $('securitySaveBtn').disabled=true; return;}
+async function api(path,options={}){const r=await fetch('/api'+path,{...options,headers:{'Content-Type':'application/json',Authorization:'Bearer '+token,...(options.headers||{})},body:options.body?JSON.stringify(options.body):undefined});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'Ошибка запроса');return d;}
+try{const d=await api('/me');const u=d.user||{};$('accountLabel').textContent=(u.name||u.username||'Аккаунт')+(u.username?' · @'+u.username:'');$('twoFactorEnabledInput').checked=!!u.twoFactorEnabled;}catch(e){$('accountLabel').textContent='Не удалось проверить сессию: '+e.message;}
+const defaults={email:'Все',online:'Все',avatar:'Все',messages:'Все',groups:'Все',channels:'Все',username:'Все'};let saved={};try{saved=JSON.parse(localStorage.getItem('nevogramPrivacy')||'{}')}catch{}
+document.querySelectorAll('[data-privacy]').forEach(x=>x.value=saved[x.dataset.privacy]||defaults[x.dataset.privacy]||'Все');
+$('securitySaveBtn').addEventListener('click',async()=>{const status=$('securityStatus');status.textContent='';try{const d=await api('/me/security',{method:'PUT',body:{enabled:$('twoFactorEnabledInput').checked,password:$('securityPasswordInput').value,secretCode:$('securityCodeInput').value.trim()}});$('securityStatus').textContent=d.enabled?'Двухфакторная защита включена.':'Двухфакторная защита выключена.';$('securityPasswordInput').value='';$('securityCodeInput').value='';}catch(e){status.textContent=e.message;}});
+$('privacySaveBtn').addEventListener('click',()=>{const values={};document.querySelectorAll('[data-privacy]').forEach(x=>values[x.dataset.privacy]=x.value);localStorage.setItem('nevogramPrivacy',JSON.stringify(values));$('privacyStatus').textContent='Настройки сохранены на этом устройстве.';});
+})();
+</script></body></html>
