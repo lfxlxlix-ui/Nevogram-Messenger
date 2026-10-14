@@ -166,7 +166,16 @@ app.put('/api/me/security', authMiddleware, (req, res) => {
 
 
 app.get('/api/me', authMiddleware, (req, res) => {
-  res.json({ user: publicUser(req.user) });
+  const user = req.user;
+  res.json({ user: {
+    ...publicUser(user),
+    firstName: user.firstName || (user.name || '').split(' ')[0] || '',
+    lastName: user.lastName || (user.name || '').split(' ').slice(1).join(' '),
+    birthday: user.birthday || '',
+    avatar: user.avatar || '',
+    banner: user.banner || '',
+    bio: user.bio || user.about || ''
+  } });
 });
 
 app.put('/api/me/profile', authMiddleware, (req, res) => {
