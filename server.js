@@ -9,6 +9,7 @@ const { state, save, init } = require('./db');
 
 const PORT = process.env.PORT || 3000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'changeme123';
+const ADMIN_SECRET_CODE = process.env.ADMIN_SECRET_CODE || '';
 const SESSION_SECRET = process.env.SESSION_SECRET || 'nevogram-session-secret-change-in-render-settings';
 
 const app = express();
@@ -59,17 +60,7 @@ app.get('/profile/:profileId', (req, res) => {
   </style></head><body><main class="profile-page"><header class="profile-top"><a href="/home" aria-label="Назад">‹</a><strong>Профиль</strong></header><div class="profile-cover"></div><section class="profile-hero"><div class="profile-avatar">${avatar ? '<img src="' + avatar + '" alt="Аватар">' : initial}</div><div class="profile-name">${name}${verifiedBadge}</div><div class="profile-online">@${username}</div><div class="profile-actions" id="profileActions" data-profile-id="${publicId}"><a id="writeProfile" href="/home">✉ Написать</a><a id="editProfile" class="secondary" href="/editprofile" hidden>✎ Изменить профиль</a></div></section><script>(async()=>{const token=sessionStorage.getItem("token");if(!token)return;try{const r=await fetch("/api/me",{headers:{Authorization:"Bearer "+token}});if(!r.ok)return;const d=await r.json();const actions=document.getElementById("profileActions");if(String(d.user?.publicId||"")===actions.dataset.profileId){document.getElementById("writeProfile").hidden=true;document.getElementById("editProfile").hidden=false;}}catch(e){}})();</script><section class="profile-section"><div class="profile-label">О себе</div><div class="profile-value">${about}</div><div class="profile-id">ID пользователя: ${publicId}</div></section></main></body></html>`);
 });
 
-app.get('/admin', (req, res) => {
-  res.type('html').send(`<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0e1621"><title>Админ-панель — Nevogram</title><link rel="stylesheet" href="/style.css"></head><body><main class="auth-screen"><section class="auth-card" style="max-width:680px"><div class="auth-logo">✈️</div><h1>Nevogram Admin</h1><p class="auth-sub">Управление бета-приглашениями и пользователями</p><form id="adminLogin"><label id="adminPasswordLabel" for="adminPassword" style="display:block;text-align:left;margin:10px 0 6px">Пароль администратора</label><input id="adminPassword" type="password" placeholder="Введи пароль администратора" autocomplete="current-password" required style="display:block;width:100%;box-sizing:border-box"><button id="adminLoginButton" type="submit">Войти</button></form><div id="adminError" class="auth-error"></div><section id="adminPanel" hidden><button id="createInvite" type="button">Создать бета-код</button><p id="newInvite"></p><h2>Приглашения</h2><div id="invites"></div><h2>Пользователи</h2><div id="users"></div><h2>Заявки на верификацию</h2><div id="verificationRequests"></div></section><p class="register-hint"><a href="/home">Открыть мессенджер</a></p></section></main><script>
-let adminToken= sessionStorage.getItem('nevogramAdminToken')||'';
-const err=document.getElementById('adminError');
-async function call(path,method='GET',body){const r=await fetch('/api/admin'+path,{method,headers:{'Content-Type':'application/json',...(adminToken?{Authorization:'Bearer '+adminToken}:{})},...(body!==undefined?{body:JSON.stringify(body)}:{})});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'Ошибка запроса');return d;}
-async function refresh(){const [i,u,v]=await Promise.all([call('/invites'),call('/users'),call('/verification-requests')]);document.getElementById('invites').innerHTML=i.invites.map(v=>'<p>'+(v.used?'':'<button type="button" data-delete-invite="'+v.id+'" style="margin-right:8px;background:#fff;color:#d11;border:1px solid #d11">Удалить</button>')+v.codePreview+' · '+(v.used?'использован':'не использован')+'</p>').join('')||'<p>Пока нет кодов</p>';document.querySelectorAll('[data-delete-invite]').forEach(btn=>btn.addEventListener('click',async()=>{if(btn.dataset.confirm!=='yes'){btn.dataset.confirm='yes';btn.textContent='точно?';btn.style.background='#fff';btn.style.color='#d11';btn.style.border='1px solid #d11';return;}try{await call('/invites/'+encodeURIComponent(btn.dataset.deleteInvite),'DELETE');await refresh();}catch(e){err.textContent=e.message;}}));document.getElementById('users').innerHTML=u.users.map(v=>'<label style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #263746"><input type="checkbox" data-verify-user="'+v.id+'" '+(v.verified?'checked':'')+' style="width:auto;margin:0"><span>@'+String(v.name||v.email).replace(/[&<>\"]/g,'')+'</span><small style="color:#72b5f8">'+(v.verified?'✓ подтверждён':'')+'</small></label>').join('')||'<p>Пока нет пользователей</p>';document.querySelectorAll('[data-verify-user]').forEach(box=>box.addEventListener('change',async()=>{box.disabled=true;try{await call('/users/'+encodeURIComponent(box.dataset.verifyUser)+'/verification','PATCH',{verified:box.checked});await refresh();}catch(e){err.textContent=e.message;box.checked=!box.checked;box.disabled=false;}}));document.getElementById('verificationRequests').innerHTML=v.requests.map(r=>'<article style="border:1px solid #2a3c4d;border-radius:12px;padding:12px;margin:10px 0"><b>@'+String(r.username).replace(/[&<>\"]/g,'')+'</b> · '+(r.status==='pending'?'На рассмотрении':r.status==='approved'?'Одобрена':'Отклонена')+'<p>Соцсеть: '+String(r.network).replace(/[&<>\"]/g,'')+' · ник: '+String(r.socialUsername).replace(/[&<>\"]/g,'')+'</p><p>Подписчики: '+String(r.followers).replace(/[&<>\"]/g,'')+'</p><p>Зачем нужна верификация: '+String(r.reason).replace(/[&<>\"]/g,'')+'</p><p>Ссылка на канал: '+String(r.channelLink || r.proof || '').replace(/[&<>\"]/g,'')+'</p>'+(r.status==='pending'?'<button type="button" data-request-decision="approved" data-request-id="'+r.id+'">Одобрить</button> <button type="button" data-request-decision="rejected" data-request-id="'+r.id+'">Отклонить</button>':'')+'</article>').join('')||'<p>Заявок пока нет.</p>';document.querySelectorAll('[data-request-decision]').forEach(btn=>btn.addEventListener('click',async()=>{btn.disabled=true;try{await call('/verification-requests/'+encodeURIComponent(btn.dataset.requestId),'PATCH',{decision:btn.dataset.requestDecision});await refresh();}catch(e){err.textContent=e.message;btn.disabled=false;}}));}}
-document.getElementById('adminLogin').addEventListener('submit',async e=>{e.preventDefault();err.textContent='';try{const input=document.getElementById('adminPassword');const r=await fetch('/api/admin/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:input.value})});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'Ошибка входа');adminToken=d.token;sessionStorage.setItem('nevogramAdminToken',adminToken);document.getElementById('adminPanel').hidden=false;input.value='';await refresh();}catch(e){err.textContent=e.message;}});
-document.getElementById('createInvite').addEventListener('click',async()=>{try{const d=await call('/invites','POST');document.getElementById('newInvite').textContent='Новый код (сохраните сейчас, он показывается один раз): '+d.code;await refresh();}catch(e){err.textContent=e.message;}});
-if(adminToken){document.getElementById('adminPanel').hidden=false;refresh().catch(e=>{document.getElementById('adminPanel').hidden=true;sessionStorage.removeItem('nevogramAdminToken');adminToken='';err.textContent='Сессия администратора устарела. Войди заново, используя пароль администратора. ('+e.message+')';});}
-</script></body></html>`);
-});
+app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin', 'index.html')));
 
 const server = http.createServer(app);
 const io = new Server(server);
@@ -99,6 +90,7 @@ function authMiddleware(req, res, next) {
   if (!data || !data.userId) return res.status(401).json({ error: 'Не авторизован' });
   const user = state.users.find(u => u.id === data.userId);
   if (!user) return res.status(401).json({ error: 'Пользователь не найден' });
+  if (user.banned && (!user.bannedUntil || user.bannedUntil > Date.now())) return res.status(403).json({ error: 'Ваш аккаунт заблокирован администрацией' });
   req.user = user;
   next();
 }
@@ -419,8 +411,15 @@ if (!Array.isArray(state.verificationRequests)) state.verificationRequests = [];
 // Админ НЕ имеет доступа к переписке людей — только управляет кодами приглашений и видит список аккаунтов.
 app.post('/api/admin/login', (req, res) => {
   const password = String((req.body || {}).password || '');
+  const secretCode = String((req.body || {}).secretCode || '');
   if (!password || password !== ADMIN_PASSWORD) {
     return res.status(401).json({ error: 'Неверный пароль администратора' });
+  }
+  if (!ADMIN_SECRET_CODE) {
+    return res.status(503).json({ error: 'Не задан ADMIN_SECRET_CODE в Environment на Render' });
+  }
+  if (!secretCode || secretCode !== ADMIN_SECRET_CODE) {
+    return res.status(401).json({ error: 'Неверный секретный код администратора', requiresSecretCode: true });
   }
   res.json({ token: sign({ admin: true }) });
 });
@@ -500,7 +499,15 @@ app.patch('/api/admin/verification-requests/:id', adminMiddleware, (req, res) =>
 });
 
 app.get('/api/admin/users', adminMiddleware, (req, res) => {
-  res.json({ users: state.users.map(u => ({ id: u.id, email: u.email, name: u.name, verified: Boolean(u.verified), createdAt: u.createdAt })) });
+  const q = String(req.query.q || '').trim().replace(/^@/, '').toLowerCase();
+  const users = state.users.filter(u => !q || [u.username, u.email, u.name, u.id].some(v => String(v || '').toLowerCase().includes(q)));
+  res.json({ users: users.map(u => ({
+    id: u.id, username: u.username || u.email, email: u.email, name: u.name,
+    verified: Boolean(u.verified), createdAt: u.createdAt,
+    banned: Boolean(u.banned && (!u.bannedUntil || u.bannedUntil > Date.now())),
+    bannedUntil: u.bannedUntil || null, muted: Boolean(u.mutedUntil && u.mutedUntil > Date.now()),
+    mutedUntil: u.mutedUntil || null
+  })) });
 });
 
 app.patch('/api/admin/users/:id/verification', adminMiddleware, (req, res) => {
@@ -513,6 +520,77 @@ app.patch('/api/admin/users/:id/verification', adminMiddleware, (req, res) => {
   res.json({ ok: true, id: user.id, verified: user.verified });
 });
 
+
+if (!Array.isArray(state.reports)) state.reports = [];
+app.post('/api/reports', authMiddleware, (req, res) => {
+  const body = req.body || {};
+  const target = state.users.find(u => u.id === String(body.userId || ''));
+  const reason = String(body.reason || '').trim().slice(0, 1000);
+  if (!target) return res.status(404).json({ error: 'Пользователь не найден' });
+  if (target.id === req.user.id) return res.status(400).json({ error: 'Нельзя пожаловаться на собственный аккаунт' });
+  if (!reason) return res.status(400).json({ error: 'Укажите причину жалобы' });
+  const report = { id: nanoid(), reporterId: req.user.id, userId: target.id, reason, status: 'pending', createdAt: Date.now() };
+  state.reports.push(report); save();
+  res.status(201).json({ ok: true, reportId: report.id });
+});
+app.get('/api/admin/reports', adminMiddleware, (req, res) => {
+  const reports = (state.reports || []).slice().sort((a,b) => b.createdAt-a.createdAt).map(r => {
+    const target = state.users.find(u => u.id === r.userId);
+    const reporter = state.users.find(u => u.id === r.reporterId);
+    return { ...r, username: target ? (target.username || target.email) : 'удалённый аккаунт',
+      reporterUsername: reporter ? (reporter.username || reporter.email) : 'удалённый аккаунт' };
+  });
+  res.json({ reports });
+});
+app.patch('/api/admin/reports/:id', adminMiddleware, (req, res) => {
+  const report = (state.reports || []).find(r => r.id === req.params.id);
+  if (!report) return res.status(404).json({ error: 'Жалоба не найдена' });
+  const status = String((req.body || {}).status || '');
+  if (!['reviewed','dismissed'].includes(status)) return res.status(400).json({ error: 'Недопустимый статус жалобы' });
+  report.status = status; report.reviewedAt = Date.now(); save();
+  res.json({ ok: true });
+});
+app.patch('/api/admin/users/:id/ban', adminMiddleware, (req, res) => {
+  const user = state.users.find(u => u.id === req.params.id);
+  if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
+  const body = req.body || {};
+  if (body.banned === false) { user.banned = false; user.bannedUntil = null; }
+  else {
+    const minutes = Number(body.durationMinutes || 0);
+    if (!Number.isFinite(minutes) || minutes < 0 || minutes > 525600) return res.status(400).json({ error: 'Срок бана должен быть от 0 до 525600 минут' });
+    user.banned = true; user.bannedUntil = minutes === 0 ? null : Date.now() + minutes * 60000;
+    user.banReason = String(body.reason || '').trim().slice(0, 500);
+    for (const socket of io.sockets.sockets.values()) if (socket.userId === user.id) socket.disconnect(true);
+  }
+  save(); res.json({ ok: true, banned: Boolean(user.banned), bannedUntil: user.bannedUntil || null });
+});
+app.patch('/api/admin/users/:id/mute', adminMiddleware, (req, res) => {
+  const user = state.users.find(u => u.id === req.params.id);
+  if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
+  const body = req.body || {};
+  if (body.muted === false) user.mutedUntil = null;
+  else {
+    const minutes = Number(body.durationMinutes || 0);
+    if (!Number.isFinite(minutes) || minutes < 1 || minutes > 525600) return res.status(400).json({ error: 'Срок мута должен быть от 1 до 525600 минут' });
+    user.mutedUntil = Date.now() + minutes * 60000;
+    user.muteReason = String(body.reason || '').trim().slice(0, 500);
+  }
+  save(); res.json({ ok: true, muted: Boolean(user.mutedUntil && user.mutedUntil > Date.now()), mutedUntil: user.mutedUntil || null });
+});
+app.delete('/api/admin/users/:id', adminMiddleware, (req, res) => {
+  const index = state.users.findIndex(u => u.id === req.params.id);
+  if (index < 0) return res.status(404).json({ error: 'Пользователь не найден' });
+  const user = state.users[index];
+  for (const socket of io.sockets.sockets.values()) if (socket.userId === user.id) socket.disconnect(true);
+  state.users.splice(index, 1);
+  state.messages = state.messages.filter(m => m.senderId !== user.id);
+  state.chats = state.chats.filter(c => c.ownerId !== user.id && !(c.memberIds || []).includes(user.id));
+  state.invites.forEach(inv => { if (inv.usedByUserId === user.id) inv.usedByUserId = null; });
+  state.reports = (state.reports || []).filter(r => r.userId !== user.id && r.reporterId !== user.id);
+  state.verificationRequests = (state.verificationRequests || []).filter(r => r.userId !== user.id);
+  save(); res.json({ ok: true });
+});
+
 // ---------- WebSocket: обмен сообщениями в реальном времени ----------
 const onlineUsers = new Map(); // userId -> Set(socketId)
 
@@ -520,7 +598,7 @@ io.use((socket, next) => {
   const data = verify(socket.handshake.auth?.token);
   if (!data || !data.userId) return next(new Error('unauthorized'));
   const user = state.users.find(u => u.id === data.userId);
-  if (!user) return next(new Error('unauthorized'));
+  if (!user || (user.banned && (!user.bannedUntil || user.bannedUntil > Date.now()))) return next(new Error('unauthorized'));
   socket.userId = user.id;
   next();
 });
@@ -538,6 +616,11 @@ io.on('connection', (socket) => {
   socket.on('message:send', ({ chatId, text }) => {
     const chat = state.chats.find(c => c.id === chatId);
     if (!chat || !chat.memberIds.includes(socket.userId)) return;
+    const sender = state.users.find(u => u.id === socket.userId);
+    if (!sender || (sender.mutedUntil && sender.mutedUntil > Date.now())) {
+      socket.emit('message:error', { error: 'Вам временно запрещено отправлять сообщения' });
+      return;
+    }
     if (chat.type === 'channel' && chat.ownerId !== socket.userId && !(chat.adminIds || []).includes(socket.userId)) return;
     const clean = String(text || '').trim().slice(0, 4000);
     if (!clean) return;
