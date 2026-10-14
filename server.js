@@ -12,28 +12,30 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'changeme123';
 const SESSION_SECRET = process.env.SESSION_SECRET || 'please-change-this-secret-' + Math.random();
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '12mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.get(['/register', '/cananr'], (req, res) => res.sendFile(path.join(__dirname, 'public', 'register.html')));
 app.get(['/login', '/cananl', '/home', '/settings'], (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 app.get(['/cp', '/editprofile'], (req, res) => {
-  res.type('html').send(`<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Настройка профиля — Nevogram</title><link rel="stylesheet" href="/style.css"><style>
-.cp-avatar{width:124px;height:124px;border-radius:50%;background:#202b38;border:2px solid #344457;color:#d9e5f2;font-size:42px;display:flex;align-items:center;justify-content:center;margin:0 auto 10px;cursor:pointer;overflow:hidden}.cp-avatar img{width:100%;height:100%;object-fit:cover}.cp-hint{text-align:center;color:#9eafc2;font-size:14px;margin-bottom:22px}.cp-label{display:block;text-align:left;margin:12px 0 6px;color:#d9e5f2}
-</style></head><body><main class="auth-screen"><section class="auth-card"><div class="auth-logo">✈️</div><h1>Настройка профиля</h1><p class="auth-sub">Добавь информацию о себе</p>
-<button type="button" id="avatarButton" class="cp-avatar" aria-label="Добавить фотографию">＋</button><p class="cp-hint">Нажми на круг, чтобы добавить аватар</p><input id="avatarFile" type="file" accept="image/*" capture="user" hidden>
-<label class="cp-label" for="firstName">Имя (обязательно)</label><input id="firstName" type="text" maxlength="40" placeholder="Имя" autocomplete="given-name" required>
-<label class="cp-label" for="lastName">Фамилия (необязательно)</label><input id="lastName" type="text" maxlength="40" placeholder="Фамилия" autocomplete="family-name">
-<div id="cpError" class="auth-error" role="alert"></div><button type="button" id="saveProfile">Продолжить</button>
-</section></main><script>
-const token=localStorage.getItem('token');const err=document.getElementById('cpError');const file=document.getElementById('avatarFile');const avatar=document.getElementById('avatarButton');let avatarData='';
-if(!token){location.replace('/register');}
-avatar.addEventListener('click',()=>file.click());
-file.addEventListener('change',()=>{const f=file.files&&file.files[0];if(!f)return;if(!f.type.startsWith('image/')){err.textContent='Выберите изображение.';return;}if(f.size>5*1024*1024){err.textContent='Фото должно быть не больше 5 МБ.';file.value='';return;}const reader=new FileReader();reader.onload=()=>{const img=new Image();img.onload=()=>{const canvas=document.createElement('canvas');const scale=Math.min(1,512/Math.max(img.width,img.height));canvas.width=Math.round(img.width*scale);canvas.height=Math.round(img.height*scale);canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);avatarData=canvas.toDataURL('image/jpeg',0.82);avatar.innerHTML='<img alt="Аватар профиля" src="'+avatarData+'">';err.textContent='';};img.src=reader.result;};reader.readAsDataURL(f);});
-document.getElementById('saveProfile').addEventListener('click',async()=>{err.textContent='';const firstName=document.getElementById('firstName').value.trim();const lastName=document.getElementById('lastName').value.trim();if(firstName.length<1){err.textContent='Введите имя';document.getElementById('firstName').focus();return;}try{const r=await fetch('/api/me/profile',{method:'PUT',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({firstName,lastName,avatar:avatarData})});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'Не удалось сохранить профиль');location.href='/home';}catch(e){err.textContent=e.message;}});
+  res.type('html').send(`<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#17212b"><title>Редактировать профиль — Nevogram</title><link rel="stylesheet" href="/style.css"><style>
+body{background:#0e1621;color:#eaf2f8}.edit-wrap{width:min(100% - 24px,620px);margin:24px auto}.edit-card{background:#17212b;border:1px solid #263746;border-radius:18px;overflow:hidden;padding-bottom:24px}.edit-head{display:flex;align-items:center;gap:18px;padding:16px 20px;border-bottom:1px solid #263746}.edit-head a{font-size:28px;color:#72b5f8;text-decoration:none}.edit-head h1{font-size:20px;margin:0}.cover{height:180px;background:linear-gradient(135deg,#2b5278,#1c354b);position:relative;background-position:center;background-size:cover}.cover video{width:100%;height:100%;object-fit:cover}.cover-button{position:absolute;right:14px;bottom:14px;background:#0e1621cc;border:1px solid #ffffff55;color:white;border-radius:10px;padding:10px 12px;cursor:pointer}.avatar-row{padding:0 22px;display:flex;align-items:end;gap:16px;margin-top:-52px;position:relative}.avatar{width:112px;height:112px;border-radius:50%;border:4px solid #17212b;background:#34516b;display:flex;align-items:center;justify-content:center;overflow:hidden;color:white;font-size:36px;cursor:pointer;flex-shrink:0}.avatar img{width:100%;height:100%;object-fit:cover}.avatar-note{font-size:13px;color:#9eafc2;margin-bottom:12px}.edit-fields{padding:18px 22px 0}.field{display:block;margin:14px 0}.field span{display:block;color:#a9c1d4;font-size:13px;margin:0 0 7px}.field input{width:100%;box-sizing:border-box;background:#0e1621;border:1px solid #34495b;color:#f5f7fa;border-radius:10px;padding:13px 14px;font-size:16px;outline:none}.field input:focus{border-color:#72b5f8}.username-input{display:flex;align-items:center;background:#0e1621;border:1px solid #34495b;border-radius:10px;padding-left:14px}.username-input b{color:#72b5f8;font-size:16px}.username-input input{border:0;background:transparent}.hint{font-size:12px;color:#91a5b5;margin-top:6px}.birthday-locked{color:#a9c1d4;font-size:13px;margin-top:8px}.save{margin:20px 22px 0;width:calc(100% - 44px);border:0;border-radius:10px;background:#2b7ac4;color:white;font-weight:700;padding:14px;font-size:16px;cursor:pointer}.edit-error{padding:0 22px;color:#ff9c9c;margin-top:10px}.edit-success{padding:0 22px;color:#8bd9a8;margin-top:10px}@media(max-width:480px){.cover{height:145px}.edit-wrap{margin:12px auto}.avatar{width:96px;height:96px}}
+</style></head><body><main class="edit-wrap"><section class="edit-card"><header class="edit-head"><a href="/home" aria-label="Назад">‹</a><h1>Редактировать профиль</h1></header><div id="cover" class="cover"><video id="coverVideo" autoplay muted loop playsinline hidden></video><button class="cover-button" id="coverButton" type="button">Изменить баннер</button></div><input id="coverFile" type="file" accept="image/*,video/*" hidden><div class="avatar-row"><button type="button" class="avatar" id="avatarButton" aria-label="Изменить аватар">＋</button><span class="avatar-note">Нажми на круг, чтобы изменить аватар</span></div><input id="avatarFile" type="file" accept="image/*" hidden><div class="edit-fields"><label class="field"><span>Имя</span><input id="firstName" maxlength="40" autocomplete="given-name" placeholder="Имя" required></label><label class="field"><span>Фамилия (необязательно)</span><input id="lastName" maxlength="40" autocomplete="family-name" placeholder="Фамилия"></label><label class="field"><span>Username</span><div class="username-input"><b>@</b><input id="username" maxlength="32" autocomplete="username" placeholder="username" autocapitalize="none" spellcheck="false"></div><div class="hint">Без @ — символ @ добавится автоматически. Латиница, цифры и _.</div></label><label class="field"><span>Дата рождения</span><input id="birthday" type="date"><div id="birthdayHint" class="birthday-locked">После сохранения дату рождения изменить будет нельзя.</div></label></div><div id="editError" class="edit-error" role="alert"></div><div id="editSuccess" class="edit-success" role="status"></div><button type="button" class="save" id="saveProfile">Сохранить изменения</button></section></main><script>
+const token=localStorage.getItem('token');if(!token)location.replace('/login');
+const $=id=>document.getElementById(id);let avatarData='',coverData='',birthdaySaved=false;
+const error=$('editError'),success=$('editSuccess');
+function previewFile(file,kind){return new Promise((resolve,reject)=>{if(!file)return resolve('');const isVideo=file.type.startsWith('video/');if(kind==='avatar'&&isVideo)return reject(new Error('Для аватара выберите фото.'));if(kind==='cover'&&!file.type.startsWith('image/')&&!isVideo)return reject(new Error('Выберите фото или видео.'));if(file.size>(isVideo?6:5)*1024*1024)return reject(new Error(isVideo?'Видео должно быть не больше 6 МБ.':'Изображение должно быть не больше 5 МБ.'));if(isVideo){const reader=new FileReader();reader.onload=()=>resolve(String(reader.result));reader.onerror=()=>reject(new Error('Не удалось прочитать файл.'));reader.readAsDataURL(file);return;}const reader=new FileReader();reader.onload=()=>{const img=new Image();img.onload=()=>{const canvas=document.createElement('canvas');const max=kind==='avatar'?512:1400;const scale=Math.min(1,max/Math.max(img.width,img.height));canvas.width=Math.round(img.width*scale);canvas.height=Math.round(img.height*scale);canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);resolve(canvas.toDataURL('image/jpeg',.82));};img.onerror=()=>reject(new Error('Не удалось открыть изображение.'));img.src=reader.result;};reader.onerror=()=>reject(new Error('Не удалось прочитать файл.'));reader.readAsDataURL(file);});}
+function showAvatar(src,name){$('avatarButton').innerHTML=src?'<img alt="Аватар" src="'+src+'">':(name||'?').slice(0,1).toUpperCase()||'＋';}
+function showCover(src){const v=$('coverVideo');v.pause();v.removeAttribute('src');v.load();v.hidden=true;$('cover').style.backgroundImage='';if(!src)return;if(src.startsWith('data:video/')){v.src=src;v.hidden=false;}else{$('cover').style.backgroundImage='url("'+src+'")';}}
+$('avatarButton').addEventListener('click',()=>$('avatarFile').click());$('coverButton').addEventListener('click',()=>$('coverFile').click());
+$('avatarFile').addEventListener('change',async()=>{try{avatarData=await previewFile($('avatarFile').files[0],'avatar');showAvatar(avatarData,$('firstName').value);error.textContent='';}catch(e){error.textContent=e.message;}});
+$('coverFile').addEventListener('change',async()=>{try{coverData=await previewFile($('coverFile').files[0],'cover');showCover(coverData);error.textContent='';}catch(e){error.textContent=e.message;}});
+$('username').addEventListener('input',()=>{$('username').value=$('username').value.replace(/^@+/, '').replace(/[^a-zA-Z0-9_]/g,'').toLowerCase();});
+async function loadProfile(){try{const r=await fetch('/api/me',{headers:{Authorization:'Bearer '+token}});const d=await r.json();if(!r.ok)throw new Error(d.error||'Не удалось загрузить профиль');const u=d.user||{};$('firstName').value=u.firstName||((u.name||'').split(' ')[0]||'');$('lastName').value=u.lastName||((u.name||'').split(' ').slice(1).join(' '));$('username').value=(u.username||'').replace(/^@/,'');avatarData=u.avatar||'';coverData=u.banner||'';showAvatar(avatarData,$('firstName').value);showCover(coverData);birthdaySaved=Boolean(u.birthday);$('birthday').value=u.birthday||'';$('birthday').disabled=birthdaySaved;if(birthdaySaved)$('birthdayHint').textContent='Дата рождения уже сохранена и не может быть изменена.';}catch(e){error.textContent=e.message;}}
+$('saveProfile').addEventListener('click',async()=>{error.textContent='';success.textContent='';const firstName=$('firstName').value.trim(),lastName=$('lastName').value.trim(),username=$('username').value.trim(),birthday=$('birthday').value;if(!firstName){error.textContent='Введите имя.';return;}if(username&&!/^[a-z0-9_]{3,32}$/.test(username)){error.textContent='Username: 3–32 символа, латиница, цифры и _. ';return;}if(!birthdaySaved&&!birthday){error.textContent='Выберите дату рождения.';return;}try{const r=await fetch('/api/me/profile',{method:'PUT',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({firstName,lastName,username,birthday,avatar:avatarData,banner:coverData})});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'Не удалось сохранить профиль');birthdaySaved=Boolean(d.user?.birthday);$('birthday').disabled=birthdaySaved;if(birthdaySaved)$('birthdayHint').textContent='Дата рождения сохранена и больше не может быть изменена.';success.textContent='Изменения сохранены.';setTimeout(()=>{location.href='/profile/'+encodeURIComponent(d.user.publicId||'');},700);}catch(e){error.textContent=e.message;}});
+loadProfile();
 </script></body></html>`);
 });
-
 
 // Public profile links use numeric IDs, for example /profile/1.
 app.get('/profile/:profileId', (req, res) => {
@@ -170,16 +172,32 @@ app.get('/api/me', authMiddleware, (req, res) => {
 });
 
 app.put('/api/me/profile', authMiddleware, (req, res) => {
-  const firstName = String((req.body || {}).firstName || '').trim();
-  const lastName = String((req.body || {}).lastName || '').trim();
-  const avatar = String((req.body || {}).avatar || '');
+  const body = req.body || {};
+  const firstName = String(body.firstName || '').trim();
+  const lastName = String(body.lastName || '').trim();
+  const username = String(body.username || '').trim().replace(/^@+/, '').toLowerCase();
+  const avatar = String(body.avatar || '');
+  const banner = String(body.banner || '');
+  const birthday = String(body.birthday || '').trim();
   if (!firstName) return res.status(400).json({ error: 'Введите имя' });
   if (firstName.length > 40 || lastName.length > 40) return res.status(400).json({ error: 'Имя и фамилия должны быть не длиннее 40 символов' });
-  if (avatar && (!avatar.startsWith('data:image/jpeg;base64,') || avatar.length > 1500000)) return res.status(400).json({ error: 'Фото не подходит или слишком большое' });
+  if (username && !/^[a-z0-9_]{3,32}$/.test(username)) return res.status(400).json({ error: 'Username должен содержать 3–32 символа: латиницу, цифры или _' });
+  if (username && state.users.some(u => u.id !== req.user.id && String(u.username || '').toLowerCase() === username)) return res.status(409).json({ error: 'Этот username уже занят' });
+  if (avatar && (!avatar.startsWith('data:image/jpeg;base64,') || avatar.length > 1500000)) return res.status(400).json({ error: 'Фото профиля не подходит или слишком большое' });
+  if (banner && (!/^data:(image\/(jpeg|png|webp|gif)|video\/(mp4|webm|quicktime));base64,/.test(banner) || banner.length > 8500000)) return res.status(400).json({ error: 'Баннер должен быть фото или видео до 6 МБ' });
+  if (birthday && !/^\d{4}-\d{2}-\d{2}$/.test(birthday)) return res.status(400).json({ error: 'Укажите корректную дату рождения' });
+  if (birthday && !req.user.birthday) {
+    const parsed = new Date(birthday + 'T00:00:00Z');
+    if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== birthday || parsed > new Date()) return res.status(400).json({ error: 'Укажите корректную дату рождения' });
+  }
+  if (req.user.birthday && birthday && birthday !== req.user.birthday) return res.status(400).json({ error: 'Дата рождения уже сохранена и не может быть изменена' });
   req.user.firstName = firstName;
   req.user.lastName = lastName;
   req.user.name = [firstName, lastName].filter(Boolean).join(' ');
+  if (username) req.user.username = username;
   if (avatar) req.user.avatar = avatar;
+  if (banner) req.user.banner = banner;
+  if (birthday && !req.user.birthday) req.user.birthday = birthday;
   save();
   res.json({ ok: true, user: publicUser(req.user) });
 });
