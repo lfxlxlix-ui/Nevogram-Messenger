@@ -178,8 +178,8 @@
       el('addAccountChoiceModal').classList.remove('hidden');
     });
   });
-  el('loginExistingAccountBtn').addEventListener('click', () => { location.href = '/login?switch=1'; });
-  el('createNewAccountBtn').addEventListener('click', () => { location.href = '/register'; });
+  el('loginExistingAccountBtn').addEventListener('click', () => { location.href = '/cananl?switch=1'; });
+  el('createNewAccountBtn').addEventListener('click', () => { location.href = '/cananr'; });
 
   function setupNavigation(){
     document.querySelectorAll('[data-nav]').forEach(a=>a.classList.toggle('active',a.dataset.nav===(location.pathname==='/settings'?'settings':'home')));
