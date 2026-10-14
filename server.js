@@ -674,6 +674,8 @@ io.use((socket, next) => {
   next();
 });
 
+const activeVoiceChats = new Set();
+
 io.on('connection', (socket) => {
   if (!onlineUsers.has(socket.userId)) onlineUsers.set(socket.userId, new Set());
   onlineUsers.get(socket.userId).add(socket.id);
@@ -739,17 +741,40 @@ io.on('connection', (socket) => {
     io.to(chatId).emit('message:deleted', { chatId, messageId });
   });
 
-  socket.on('voice:join', ({ chatId }) => {
+  socket.on('voice:start', ({ chatId }) => {
     const chat = state.chats.find(c => c.id === chatId && c.type === 'channel');
     if (!chat || !chat.memberIds.includes(socket.userId) || !channelPermission(chat, socket.userId, 'voiceChat')) {
       socket.emit('voice:error', { error: 'Нет разрешения начинать голосовой чат' }); return;
     }
-    const room = 'voice:' + chatId;
-    const peers = [...io.sockets.adapter.rooms.get(room) || []].filter(id => id !== socket.id);
-    socket.join(room);
-    socket.emit('voice:peers', { chatId, peers });
-    socket.to(room).emit('voice:peer-joined', { peerId: socket.id, userId: socket.userId });
+    activeVoiceChats.add(chatId);
+    io.to(chatId).emit('voice:started', { chatId, by: socket.userId });
+    joinVoiceRoom(socket, chatId);
   });
+  socket.on('voice:join', ({ chatId }) => {
+    const chat = state.chats.find(c => c.id === chatId && c.type === 'channel');
+    if (!chat || !chat.memberIds.includes(socket.userId) || !activeVoiceChats.has(chatId)) {
+      socket.emit('voice:error', { error: 'Голосовой чат сейчас не активен' }); return;
+    }
+    joinVoiceRoom(socket, chatId);
+  });
+  socket.on('voice:stop', ({ chatId }) => {
+    const chat = state.chats.find(c => c.id === chatId && c.type === 'channel');
+    if (!chat || !channelPermission(chat, socket.userId, 'voiceChat')) return;
+    activeVoiceChats.delete(chatId);
+    io.to(chatId).emit('voice:stopped', { chatId });
+    const room = 'voice:' + chatId;
+    for (const id of [...io.sockets.adapter.rooms.get(room) || []]) {
+      const peer = io.sockets.sockets.get(id);
+      if (peer) { peer.to(room).emit('voice:peer-left', { peerId: id }); peer.leave(room); }
+    }
+  });
+  function joinVoiceRoom(client, chatId) {
+    const room = 'voice:' + chatId;
+    const peers = [...io.sockets.adapter.rooms.get(room) || []].filter(id => id !== client.id);
+    client.join(room);
+    client.emit('voice:peers', { chatId, peers });
+    client.to(room).emit('voice:peer-joined', { peerId: client.id, userId: client.userId });
+  }
   socket.on('voice:leave', ({ chatId }) => {
     const room = 'voice:' + chatId;
     socket.to(room).emit('voice:peer-left', { peerId: socket.id });
@@ -789,6 +814,8 @@ io.on('connection', (socket) => {
       io.to(chatId).emit('read', { chatId, userId: socket.userId });
     }
   });
+
+  for (const chatId of [...activeVoiceChats]) { /* active calls remain until an admin explicitly stops them */ }
 
   socket.on('disconnect', () => {
     const set = onlineUsers.get(socket.userId);
