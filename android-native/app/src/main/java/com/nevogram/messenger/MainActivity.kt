@@ -3,14 +3,14 @@ package com.nevogram.messenger
 import android.app.Activity
 import android.os.Bundle
 import android.graphics.Color
-import android.view.Gravity
-import android.view.View
-import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import io.socket.client.IO
+import io.socket.client.Socket
+import io.socket.emitter.Emitter
 import org.json.JSONObject
 import org.json.JSONArray
 import java.net.HttpURLConnection
@@ -20,7 +20,9 @@ import kotlin.concurrent.thread
 class MainActivity : Activity() {
     private val baseUrl = "https://nevogram-messenger.onrender.com"
     private var token: String? = null
+    private var socket: Socket? = null
     private var currentChatId: String? = null
+    private var currentChatTitle: String = "Чат"
     private lateinit var root: LinearLayout
     private lateinit var content: LinearLayout
     private val bg = Color.rgb(17, 27, 39)
@@ -32,6 +34,11 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         showLogin()
+    }
+
+    override fun onDestroy() {
+        disconnectSocket()
+        super.onDestroy()
     }
 
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
@@ -90,6 +97,9 @@ class MainActivity : Activity() {
         }
 
     private fun showLogin(message: String = "") {
+        disconnectSocket()
+        token = null
+        currentChatId = null
         makeRoot("Nevogram")
         content.addView(label("Войди в свой аккаунт, чтобы открыть чаты.", 15f))
         val username = field("Логин")
@@ -112,19 +122,72 @@ class MainActivity : Activity() {
                 request("POST", "/api/auth/login", JSONObject().put("username", user).put("password", pass).put("twoFactorCode", code), null) { result, error ->
                     if (error != null) { showLogin(error); return@request }
                     if (result?.optBoolean("requiresTwoFactor") == true) { showLogin("Введите код двухфакторной защиты."); return@request }
-                    token = result?.optString("token")
-                    if (token.isNullOrBlank()) showLogin("Сервер не вернул токен входа.") else loadChats()
+                    val receivedToken = result?.optString("token")
+                    if (receivedToken.isNullOrBlank() || receivedToken == "null") {
+                        showLogin("Сервер не вернул токен входа.")
+                    } else {
+                        token = receivedToken
+                        connectSocket(receivedToken)
+                        loadChats()
+                    }
                 }
             }
         })
         content.addView(label("Nevogram • мобильное приложение", 12f).apply { setTextColor(muted) })
     }
 
+    private fun connectSocket(sessionToken: String) {
+        disconnectSocket()
+        try {
+            val options = IO.Options().apply {
+                auth = mapOf("token" to sessionToken)
+                reconnection = true
+                reconnectionAttempts = Int.MAX_VALUE
+                reconnectionDelay = 1000
+            }
+            val newSocket = IO.socket(baseUrl, options)
+            socket = newSocket
+            newSocket.on("message:new", Emitter.Listener { args ->
+                val data = args.firstOrNull() as? JSONObject ?: return@Listener
+                val chatId = data.optString("chatId")
+                runOnUiThread {
+                    if (token == sessionToken && currentChatId == chatId) {
+                        openChat(chatId, currentChatTitle)
+                    } else if (token == sessionToken) {
+                        // Refresh the list so its latest-message preview stays current.
+                        if (currentChatId == null) loadChats()
+                    }
+                }
+            })
+            newSocket.on("chat:new", Emitter.Listener {
+                runOnUiThread { if (token == sessionToken && currentChatId == null) loadChats() }
+            })
+            newSocket.on(Socket.EVENT_CONNECT_ERROR, Emitter.Listener {
+                runOnUiThread {
+                    if (token == sessionToken && currentChatId == null) {
+                        // REST still works if the realtime connection is temporarily unavailable.
+                    }
+                }
+            })
+            newSocket.connect()
+        } catch (_: Exception) {
+            socket = null
+        }
+    }
+
+    private fun disconnectSocket() {
+        socket?.off()
+        socket?.disconnect()
+        socket?.close()
+        socket = null
+    }
+
     private fun loadChats() {
         request("GET", "/api/chats", null, token) { result, error ->
             if (error != null) { showLogin(error); return@request }
+            currentChatId = null
             makeRoot("Ваши чаты")
-            content.addView(button("Выйти из аккаунта") { token = null; currentChatId = null; showLogin() })
+            content.addView(button("Выйти из аккаунта") { showLogin() })
             val list = result?.optJSONArray("chats") ?: JSONArray()
             if (list.length() == 0) content.addView(label("Пока нет чатов. Когда вам напишут или вы начнёте переписку, она появится здесь.", 14f))
             for (i in 0 until list.length()) {
@@ -139,8 +202,11 @@ class MainActivity : Activity() {
 
     private fun openChat(id: String, title: String) {
         currentChatId = id
+        currentChatTitle = title
         request("GET", "/api/chats/$id/messages", null, token) { result, error ->
             if (error != null) { loadChats(); return@request }
+            // A delayed response for a chat the user already left must not replace the current screen.
+            if (currentChatId != id) return@request
             makeRoot(title)
             content.addView(button("‹ Все чаты") { loadChats() })
             val scroll = ScrollView(this)
@@ -160,7 +226,58 @@ class MainActivity : Activity() {
             }
             scroll.addView(messages)
             content.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
-            content.addView(label("Отправка сообщений будет добавлена следующим этапом.", 12f).apply { setTextColor(muted) })
+
+            val composer = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                setPadding(0, dp(8), 0, 0)
+            }
+            val messageInput = EditText(this).apply {
+                hint = "Сообщение"
+                setTextColor(white)
+                setHintTextColor(muted)
+                textSize = 16f
+                minHeight = dp(48)
+                maxLines = 4
+                setPadding(dp(12), dp(8), dp(12), dp(8))
+                setBackgroundColor(panel)
+                layoutParams = LinearLayout.LayoutParams(0, -2, 1f).apply { rightMargin = dp(8) }
+            }
+            val send = Button(this).apply {
+                text = "➤"
+                contentDescription = "Отправить сообщение"
+                isAllCaps = false
+                setTextColor(white)
+                setBackgroundColor(accent)
+                layoutParams = LinearLayout.LayoutParams(dp(64), dp(52))
+            }
+            val sendStatus = label("", 12f).apply { setTextColor(muted) }
+            fun sendMessage() {
+                val cleanText = messageInput.text.toString().trim()
+                if (cleanText.isEmpty()) return
+                val activeSocket = socket
+                if (activeSocket == null || !activeSocket.connected()) {
+                    sendStatus.text = "Нет соединения. Переподключаемся…"
+                    socket?.connect()
+                    return
+                }
+                send.isEnabled = false
+                activeSocket.emit("message:send", JSONObject().put("chatId", id).put("text", cleanText))
+                messageInput.text.clear()
+                sendStatus.text = "Отправлено"
+                send.isEnabled = true
+            }
+            send.setOnClickListener { sendMessage() }
+            messageInput.setOnEditorActionListener { _, actionId, event ->
+                if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_SEND ||
+                    (event != null && event.keyCode == android.view.KeyEvent.KEYCODE_ENTER && event.action == android.view.KeyEvent.ACTION_DOWN)) {
+                    sendMessage()
+                    true
+                } else false
+            }
+            composer.addView(messageInput)
+            composer.addView(send)
+            content.addView(composer)
+            content.addView(sendStatus)
         }
     }
 
