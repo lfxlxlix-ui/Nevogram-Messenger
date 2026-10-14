@@ -727,5 +727,16 @@
     return div.innerHTML;
   }
 
+  // ---------- Плавающее объявление официального Telegram-канала ----------
+  const telegramPromo = el('officialTelegramPromo');
+  const closeTelegramPromo = el('closeTelegramPromo');
+  if (telegramPromo && closeTelegramPromo) {
+    if (localStorage.getItem('nevogramTelegramPromoDismissed') === '1') telegramPromo.classList.add('hidden');
+    closeTelegramPromo.addEventListener('click', () => {
+      telegramPromo.classList.add('hidden');
+      localStorage.setItem('nevogramTelegramPromoDismissed', '1');
+    });
+  }
+
   tryResumeSession();
 })();
