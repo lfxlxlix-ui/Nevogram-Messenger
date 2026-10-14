@@ -469,11 +469,14 @@
     localStorage.setItem('nevogramPrivacy', JSON.stringify(saved));
     el('privacyModal').classList.add('hidden');
   }
-  el('privacyOpenBtn').addEventListener('click', () => {
-    loadPrivacySettings();
-    el('twoFactorEnabledInput').checked = Boolean(state.me && state.me.twoFactorEnabled);
-    el('privacyModal').classList.remove('hidden');
-  });
+  const privacyOpenBtn = el('privacyOpenBtn');
+  if (privacyOpenBtn) {
+    privacyOpenBtn.addEventListener('click', () => {
+      loadPrivacySettings();
+      el('twoFactorEnabledInput').checked = Boolean(state.me && state.me.twoFactorEnabled);
+      el('privacyModal').classList.remove('hidden');
+    });
+  }
   el('privacySaveBtn').addEventListener('click', savePrivacySettings);
 
   // ---------- Утилиты ----------
