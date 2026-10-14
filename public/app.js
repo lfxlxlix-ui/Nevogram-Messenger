@@ -362,8 +362,8 @@
         el('channelAdminsOpenBtn').classList.toggle('hidden', !(chat.isOwner || chat.isAdmin || chat.adminPermissions?.manageAdmins));
         el('voiceStartBtn').classList.toggle('hidden', !(chat.isOwner || chat.adminPermissions?.voiceChat));
         el('voiceLeaveBtn').classList.add('hidden');
-        el('voiceJoinBtn').classList.add('hidden');
-        el('voiceStatus').textContent = '';
+        el('voiceJoinBtn').classList.toggle('hidden', !chat.voiceActive);
+        el('voiceStatus').textContent = chat.voiceActive ? 'Голосовой чат активен' : '';
       }
     }
   }
