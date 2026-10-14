@@ -38,7 +38,7 @@ document.getElementById('saveProfile').addEventListener('click',async()=>{err.te
 // Public profile links use numeric IDs, for example /profile/1.
 app.get('/profile/:profileId', (req, res) => {
   const profileId = String(req.params.profileId || '').trim();
-  if (!/^\\d+$/.test(profileId)) return res.redirect('/login');
+  if (!/^\d+$/.test(profileId)) return res.redirect('/login');
   const user = state.users.find((u, index) => String(u.publicId || index + 1) === profileId);
   if (!user) {
     return res.status(404).type('html').send(`<!doctype html><html lang="ru"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Профиль не найден — Nevogram</title><link rel="stylesheet" href="/style.css"><body><main class="auth-screen"><section class="auth-card"><h1>Профиль не найден</h1><p class="auth-sub">Проверьте ссылку или логин пользователя.</p><a href="/login">Вернуться в Nevogram</a></section></main></body></html>`);
