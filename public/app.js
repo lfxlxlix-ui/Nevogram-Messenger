@@ -617,7 +617,8 @@
   }
 
   // ---------- Новый личный чат ----------
-  el('newDirectBtn').addEventListener('click', () => el('directModal').classList.remove('hidden'));
+  const newDirectBtn = el('newDirectBtn');
+  if (newDirectBtn) newDirectBtn.addEventListener('click', () => el('directModal').classList.remove('hidden'));
   el('directSubmit').addEventListener('click', async () => {
     el('directError').textContent = '';
     try {
@@ -632,7 +633,8 @@
   });
 
   // ---------- Новая группа ----------
-  el('newGroupBtn').addEventListener('click', () => el('groupModal').classList.remove('hidden'));
+  const newGroupBtn = el('newGroupBtn');
+  if (newGroupBtn) newGroupBtn.addEventListener('click', () => el('groupModal').classList.remove('hidden'));
   el('groupSubmit').addEventListener('click', async () => {
     el('groupError').textContent = '';
     try {
