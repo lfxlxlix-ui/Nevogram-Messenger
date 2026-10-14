@@ -174,8 +174,8 @@
     });
     state.socket.on('message:error', ({ error }) => alert(error || 'Не удалось выполнить действие'));
     state.socket.on('voice:error', ({ error }) => { el('voiceStatus').textContent = error || 'Ошибка голосового чата'; });
-    state.socket.on('voice:started', ({ chatId }) => { if (state.activeChat?.id === chatId) el('voiceStatus').textContent = 'Голосовой чат активен'; });
-    state.socket.on('voice:stopped', ({ chatId }) => { if (state.activeChat?.id === chatId) { leaveVoiceLocal(); el('voiceStatus').textContent = 'Голосовой чат завершён'; } });
+    state.socket.on('voice:started', ({ chatId }) => { if (state.activeChat?.id === chatId) { el('voiceStatus').textContent = 'Голосовой чат активен'; el('voiceJoinBtn').classList.toggle('hidden', Boolean(voiceChatId)); } });
+    state.socket.on('voice:stopped', ({ chatId }) => { if (state.activeChat?.id === chatId) { leaveVoiceLocal(); el('voiceJoinBtn').classList.add('hidden'); el('voiceStatus').textContent = 'Голосовой чат завершён'; } });
     state.socket.on('voice:peer-joined', async ({ peerId }) => { if (voiceChatId && voiceChatId === state.activeChat?.id) await createVoiceOffer(peerId); });
     state.socket.on('voice:peers', async ({ chatId, peers }) => { if (voiceChatId === chatId) for (const peerId of peers) await createVoiceOffer(peerId); });
     state.socket.on('voice:offer', async ({ from, chatId, offer }) => {
@@ -362,6 +362,7 @@
         el('channelAdminsOpenBtn').classList.toggle('hidden', !(chat.isOwner || chat.isAdmin || chat.adminPermissions?.manageAdmins));
         el('voiceStartBtn').classList.toggle('hidden', !(chat.isOwner || chat.adminPermissions?.voiceChat));
         el('voiceLeaveBtn').classList.add('hidden');
+        el('voiceJoinBtn').classList.add('hidden');
         el('voiceStatus').textContent = '';
       }
     }
@@ -384,7 +385,7 @@
   }
   async function joinVoiceChat() {
     const chat=state.activeChat;if(!chat||chat.type!=='channel')return;
-    try { voiceStream=await navigator.mediaDevices.getUserMedia({audio:true,video:false}); voiceChatId=chat.id;el('voiceStartBtn').classList.add('hidden');el('voiceLeaveBtn').classList.remove('hidden');el('voiceStatus').textContent='Подключение…';state.socket.emit('voice:join',{chatId:chat.id}); }
+    try { voiceStream=await navigator.mediaDevices.getUserMedia({audio:true,video:false}); voiceChatId=chat.id;el('voiceJoinBtn').classList.add('hidden');el('voiceStartBtn').classList.add('hidden');el('voiceLeaveBtn').classList.remove('hidden');el('voiceStatus').textContent='Подключение…';state.socket.emit('voice:join',{chatId:chat.id}); }
     catch(e){el('voiceStatus').textContent='Нет доступа к микрофону: '+e.message;}
   }
   function getVoicePeer(peerId) {
@@ -407,10 +408,12 @@
     if(voiceStream) voiceStream.getTracks().forEach(t=>t.stop());voiceStream=null;
     el('voiceAudios').innerHTML='';el('voiceLeaveBtn').classList.add('hidden');
     const chat=state.activeChat;el('voiceStartBtn').classList.toggle('hidden',!(chat && (chat.isOwner || chat.adminPermissions?.voiceChat)));
+    el('voiceJoinBtn').classList.toggle('hidden',!(chat && chat.type === 'channel'));
     voiceChatId=null;
   }
   el('channelAdminsOpenBtn').addEventListener('click',()=>{if(state.activeChat)openChannelAdmins(state.activeChat);});
   el('voiceStartBtn').addEventListener('click',startVoiceChat);
+  el('voiceJoinBtn').addEventListener('click',joinVoiceChat);
   el('voiceLeaveBtn').addEventListener('click',()=>{if(voiceChatId)state.socket.emit('voice:stop',{chatId:voiceChatId});leaveVoiceLocal();});
 
   async function openChannelAdmins(chat) {
@@ -511,23 +514,24 @@
     const div = document.createElement('div');
     div.className = 'msg ' + (mine ? 'out' : 'in');
     div.dataset.messageId = msg.id;
-    const canEdit = state.activeChat && state.activeChat.type === 'channel' && (state.activeChat.isOwner || state.activeChat.adminPermissions?.editMessages);
-    const canDelete = state.activeChat && state.activeChat.type === 'channel' && (state.activeChat.isOwner || state.activeChat.adminPermissions?.deleteMessages);
+    const isChannel = state.activeChat && state.activeChat.type === 'channel';
+    const canEdit = isChannel ? (state.activeChat.isOwner || state.activeChat.adminPermissions?.editMessages) : mine;
+    const canDelete = isChannel ? (state.activeChat.isOwner || state.activeChat.adminPermissions?.deleteMessages) : mine;
     div.innerHTML = `
       ${!mine && state.activeChat && state.activeChat.type === 'group' ? `<div class="sender">${escapeHtml(msg.senderName)}</div>` : ''}
       <div class="text">${escapeHtml(msg.text)}</div>
       <div class="meta">${formatTime(msg.createdAt)}${msg.editedAt ? ' · изменено' : ''}${mine ? ' ✓' : ''}</div>
-      ${(mine || canEdit || canDelete) ? '<div class="message-actions"></div>' : ''}`;
+      ${(canEdit || canDelete) ? '<div class="message-actions"></div>' : ''}`;
     const actions = div.querySelector('.message-actions');
     if (actions) {
-      if (mine || canEdit) {
+      if (canEdit) {
         const edit = document.createElement('button'); edit.type='button'; edit.textContent='Изменить';
         edit.addEventListener('click', () => {
           const next = prompt('Изменить сообщение', msg.text);
           if (next !== null && next.trim()) state.socket.emit('message:edit', { chatId: state.activeChat.id, messageId: msg.id, text: next.trim() });
         }); actions.appendChild(edit);
       }
-      if (mine || canDelete) {
+      if (canDelete) {
         const del = document.createElement('button'); del.type='button'; del.textContent='Удалить';
         del.addEventListener('click', () => { if (confirm('Удалить это сообщение?')) state.socket.emit('message:delete', { chatId: state.activeChat.id, messageId: msg.id }); });
         actions.appendChild(del);
