@@ -109,7 +109,7 @@ function adminMiddleware(req, res, next) {
   const data = verify(token);
   if (!data || data.admin !== true) return res.status(401).json({ error: 'Нет доступа' });
   const configured = Boolean(state.adminSecurity && state.adminSecurity.secondPasswordHash && state.adminSecurity.secretCodeHash);
-  if (req.path === '/security-setup') {
+  if (req.path.endsWith('/security-setup')) {
     if (configured || !data.setupOnly) return res.status(403).json({ error: 'Настройка защиты недоступна' });
     return next();
   }
