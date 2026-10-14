@@ -170,3 +170,23 @@ html, body {
 .more-menu-card .add-account-link{display:block;margin-top:10px;padding:12px;text-align:center;border:1px dashed #cfd6e1;border-radius:12px;color:#3267c8;text-decoration:none;font-weight:650}
 .more-menu-card .search-empty{color:#737987;font-size:12px}
 @media(max-width:480px){.more-menu-card{max-width:100%;border-radius:20px}.more-menu-heading{padding:18px 18px 12px}.more-menu-card .account-list{padding:12px 14px 16px}}
+
+
+/* Polished create-group and create-channel dialogs */
+.compose-modal-card{background:#17212b;color:#e6ecf2;border:1px solid #314254;border-radius:20px;padding:22px;max-width:430px;box-shadow:0 24px 80px rgba(0,0,0,.48)}
+.compose-modal-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:20px}
+.compose-modal-heading h3{margin:2px 0 0;font-size:21px;line-height:1.25;font-weight:700;letter-spacing:-.3px}
+.compose-modal-heading p{margin:6px 0 0;color:#9baaba;font-size:13px;line-height:1.4}
+.modal-close-btn{width:36px;height:36px;flex:0 0 36px;display:inline-flex;align-items:center;justify-content:center;border:1px solid #354657;border-radius:12px;background:#223140;color:#dce7f1;font-size:25px;line-height:1;cursor:pointer;transition:background .15s,border-color .15s}
+.modal-close-btn:hover{background:#304458;border-color:#4b6680}
+.compose-modal-card input,.compose-modal-card select{display:block;width:100%;min-height:46px;padding:12px 14px;margin:0 0 12px;border-radius:12px;border:1px solid #344657;background:#202e3b;color:#edf4fb;font:inherit;font-size:14px;outline:none;box-shadow:none}
+.compose-modal-card input::placeholder{color:#91a0af;opacity:1}
+.compose-modal-card input:focus,.compose-modal-card select:focus{border-color:#4ea4f5;box-shadow:0 0 0 3px rgba(78,164,245,.15)}
+.compose-modal-card .channel-label{display:block;color:#b9c6d3;font-size:13px;margin:4px 0 12px}
+.compose-modal-card .channel-label select{margin:8px 0 0;color:#edf4fb;color-scheme:dark}
+.compose-modal-card .modal-actions{display:flex;gap:10px;margin-top:18px}
+.compose-modal-card .btn-secondary{background:#263747;color:#dbe7f2;border:1px solid #3a4b5c;min-height:42px;font-weight:600}
+.compose-modal-card .btn-secondary:hover{background:#304458}
+.compose-modal-card .btn-primary{min-height:42px;padding:10px 18px;border-radius:11px;background:#3388d8;color:white;font-weight:700}
+.compose-modal-card .modal-error{margin-top:2px;line-height:1.4}
+@media(max-width:480px){.compose-modal-card{padding:18px;border-radius:18px}.compose-modal-heading h3{font-size:19px}.modal-close-btn{width:34px;height:34px;flex-basis:34px}}
