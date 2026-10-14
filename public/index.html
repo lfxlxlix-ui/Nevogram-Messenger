@@ -45,8 +45,10 @@
       <div id="emptyState" class="empty-state">Выберите чат слева</div>
       <div id="chatView" class="chat-view hidden">
         <div class="chat-header">
-          <div id="chatTitle" class="chat-title"></div>
-          <div id="chatSubtitle" class="chat-subtitle"></div>
+          <button id="chatBackBtn" class="chat-back-btn" type="button" aria-label="Назад" title="Назад">‹</button>
+          <div id="chatAvatar" class="chat-header-avatar" aria-hidden="true"></div>
+          <div class="chat-header-info"><div id="chatTitle" class="chat-title"></div>
+          <div id="chatSubtitle" class="chat-subtitle"></div></div>
         </div>
         <div id="messages" class="messages"></div>
         <form id="sendForm" class="send-form">
