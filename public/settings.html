@@ -37,7 +37,8 @@
 </div></main>
 <script>
 (async()=>{
-const $=id=>document.getElementById(id), token=localStorage.getItem('token');
+localStorage.removeItem('token');
+const $=id=>document.getElementById(id), token=sessionStorage.getItem('token');
 if(!token){$('accountLabel').textContent='Войдите в аккаунт, чтобы управлять настройками.'; $('securitySaveBtn').disabled=true; return;}
 async function api(path,options={}){const r=await fetch('/api'+path,{...options,headers:{'Content-Type':'application/json',Authorization:'Bearer '+token,...(options.headers||{})},body:options.body?JSON.stringify(options.body):undefined});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'Ошибка запроса');return d;}
 try{const d=await api('/me');const u=d.user||{};$('accountLabel').textContent=(u.name||u.username||'Аккаунт')+(u.username?' · @'+u.username:'');$('twoFactorEnabledInput').checked=!!u.twoFactorEnabled;}catch(e){$('accountLabel').textContent='Не удалось проверить сессию: '+e.message;}
