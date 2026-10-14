@@ -315,6 +315,13 @@
   function renderChatHeader(chat) {
     const user = chat && chat.type === 'direct' ? chat.directUser : null;
     el('chatTitle').textContent = chat ? chat.title : '';
+    const openProfile = () => { if (user && user.publicId) window.location.href = '/profile/' + encodeURIComponent(user.publicId); };
+    el('chatTitle').style.cursor = user ? 'pointer' : 'default';
+    el('chatTitle').onclick = user ? openProfile : null;
+    el('chatAvatar').style.cursor = user ? 'pointer' : 'default';
+    el('chatAvatar').onclick = user ? openProfile : null;
+    el('chatSubtitle').style.cursor = user ? 'pointer' : 'default';
+    el('chatSubtitle').onclick = user ? openProfile : null;
     const avatar = el('chatAvatar');
     if (user && user.avatar) avatar.innerHTML = '<img src="' + escapeHtml(user.avatar) + '" alt="">';
     else avatar.textContent = chat && chat.type === 'channel' ? '📢' : (chat && chat.title ? chat.title.slice(0,1).toUpperCase() : '');
