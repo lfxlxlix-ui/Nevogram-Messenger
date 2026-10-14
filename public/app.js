@@ -23,7 +23,11 @@
       body: options.body ? JSON.stringify(options.body) : undefined
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || 'Ошибка запроса');
+    if (!res.ok) {
+      const error = new Error(data.error || 'Ошибка запроса');
+      error.status = res.status;
+      throw error;
+    }
     return data;
   }
 
@@ -66,9 +70,17 @@
       state.me = data.user;
       startApp();
     } catch (e) {
-      localStorage.removeItem('token');
-      state.token = null;
-      showAccountPickerOrAuth();
+      if (e.status === 401) {
+        sessionStorage.removeItem('token');
+        state.token = null;
+        showAccountPickerOrAuth();
+      } else {
+        // Keep the token when the server/network fails temporarily; do not turn a transient error into a logout.
+        el('authScreen').classList.remove('hidden');
+        el('app').classList.add('hidden');
+        showAuth();
+        el('authError').textContent = 'Не удалось проверить сессию (ошибка соединения или сервера). Обнови страницу ещё раз; вход не сброшен.';
+      }
     }
   }
 
