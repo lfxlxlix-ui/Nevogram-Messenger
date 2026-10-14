@@ -14,8 +14,8 @@ const SESSION_SECRET = process.env.SESSION_SECRET || 'please-change-this-secret-
 const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
-app.get(['/register', '/canan'], (req, res) => res.sendFile(path.join(__dirname, 'public', 'register.html')));
-app.get(['/login', '/home', '/settings'], (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+app.get(['/register', '/cananr'], (req, res) => res.sendFile(path.join(__dirname, 'public', 'register.html')));
+app.get(['/login', '/cananl', '/home', '/settings'], (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 app.get('/cp', (req, res) => {
   res.type('html').send(`<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Настройка профиля — Nevogram</title><link rel="stylesheet" href="/style.css"><style>
