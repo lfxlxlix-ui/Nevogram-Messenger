@@ -9,7 +9,7 @@ const { state, save, init } = require('./db');
 
 const PORT = process.env.PORT || 3000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'changeme123';
-const SESSION_SECRET = process.env.SESSION_SECRET || 'please-change-this-secret-' + Math.random();
+const SESSION_SECRET = process.env.SESSION_SECRET || 'nevogram-session-secret-change-in-render-settings';
 
 const app = express();
 app.use(express.json({ limit: '12mb' }));
