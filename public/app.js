@@ -185,7 +185,7 @@
     document.querySelectorAll('[data-nav]').forEach(a=>a.classList.toggle('active',a.dataset.nav===(location.pathname==='/settings'?'settings':'home')));
     // Keep settings inside the authenticated app instead of navigating through a fresh page load.
     const settingsNav = document.querySelector('[data-nav="settings"]');
-    if (settingsNav) settingsNav.addEventListener('click', event => { event.preventDefault(); history.replaceState({}, '', '/home'); loadPrivacySettings(); el('twoFactorEnabledInput').checked = Boolean(state.me && state.me.twoFactorEnabled); el('privacyModal').classList.remove('hidden'); });
+    if (settingsNav) settingsNav.addEventListener('click', event => { event.preventDefault(); history.replaceState({}, '', '/settings'); loadPrivacySettings(); el('twoFactorEnabledInput').checked = Boolean(state.me && state.me.twoFactorEnabled); el('privacyModal').classList.remove('hidden'); });
     el('myProfileNav').onclick=e=>{e.preventDefault();location.href='/profile/'+encodeURIComponent(state.me.publicId||1)};
     el('searchOpenBtn').onclick=()=>{el('globalSearchModal').classList.remove('hidden');el('globalSearchInput').focus()};
     el('moreOpenBtn').onclick=()=>{renderAccountList();el('moreModal').classList.remove('hidden')};
@@ -211,7 +211,7 @@
     }
     localStorage.setItem('nevogramAccounts',JSON.stringify(accounts));
     const box=el('accountList');box.innerHTML='<p class="account-heading">Аккаунты ('+accounts.length+'/3)</p>'+accounts.map(a=>'<div class="account-row"><button type="button" class="account-option" data-account="'+escapeHtml(a.id)+'">'+escapeHtml(a.name||a.username)+' <small>@'+escapeHtml(a.username)+'</small></button><button type="button" class="remove-saved-account" data-remove-account="'+escapeHtml(a.id)+'" aria-label="Убрать аккаунт из списка" title="Убрать из списка">×</button></div>').join('')+(accounts.length>=3?'<p class="search-empty">Достигнут лимит: 3 аккаунта</p>':'<a class="add-account-link" href="/canan">＋ Добавить аккаунт</a>');
-    box.querySelectorAll('[data-account]').forEach(b=>b.onclick=()=>{const a=accounts.find(x=>String(x.id)===b.dataset.account);if(a){localStorage.setItem('token',a.token);location.href='/home'}});
+    box.querySelectorAll('[data-account]').forEach(b=>b.onclick=()=>{const a=accounts.find(x=>String(x.id)===b.dataset.account);if(a){localStorage.setItem('token',a.token);location.href='/chats'}});
     box.querySelectorAll('[data-remove-account]').forEach(b=>b.onclick=(event)=>{event.stopPropagation();const account=accounts.find(x=>String(x.id)===b.dataset.removeAccount);if(!account)return;if(!confirm('Убрать аккаунт @'+(account.username||account.name)+' из списка переключения?'))return;const remaining=normalizeAccounts(accounts).filter(x=>String(x.id)!==String(account.id));localStorage.setItem('nevogramAccounts',JSON.stringify(remaining));renderAccountList();});
   }
 
@@ -332,7 +332,7 @@
     try {
       const body = username ? { username } : { id: invite.split('.')[0], inviteCode: invite.split('.').slice(1).join('.') };
       const d = await api('/channels/join', { method: 'POST', body });
-      history.replaceState({}, '', '/home');
+      history.replaceState({}, '', '/chats');
       await loadChats(); openChat(d.chat.id);
     } catch (e) { alert(e.message); }
   }
