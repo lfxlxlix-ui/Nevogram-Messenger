@@ -1,0 +1,15 @@
+{
+  "appId": "com.nevogram.messenger",
+  "appName": "Nevogram",
+  "webDir": "public",
+  "server": {
+    "url": "https://nevogram-messenger.onrender.com",
+    "cleartext": false,
+    "allowNavigation": [
+      "nevogram-messenger.onrender.com"
+    ]
+  },
+  "android": {
+    "allowMixedContent": false
+  }
+}
