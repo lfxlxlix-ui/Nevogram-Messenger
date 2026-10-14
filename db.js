@@ -5,7 +5,7 @@ const path = require('path');
 const DATA_DIR = path.join(__dirname, 'data');
 const DATA_FILE = path.join(DATA_DIR, 'store.json');
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-function defaultState() { return { users: [], invites: [], chats: [], messages: [] }; }
+function defaultState() { return { users: [], invites: [], chats: [], messages: [], verificationRequests: [] }; }
 let state;
 try { state = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')); } catch { state = defaultState(); }
 let pool = null;
@@ -23,7 +23,7 @@ async function init() {
     const loaded = result.rows[0].state;
     for (const key of Object.keys(state)) delete state[key];
     Object.assign(state, loaded && typeof loaded === 'object' ? loaded : defaultState());
-    for (const key of ['users', 'invites', 'chats', 'messages']) if (!Array.isArray(state[key])) state[key] = [];
+    for (const key of ['users', 'invites', 'chats', 'messages', 'verificationRequests']) if (!Array.isArray(state[key])) state[key] = [];
   } else {
     await pool.query('INSERT INTO nevogram_state (id, state) VALUES (1, $1::jsonb) ON CONFLICT (id) DO NOTHING', [JSON.stringify(state)]);
   }
