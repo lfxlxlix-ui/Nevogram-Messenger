@@ -317,17 +317,84 @@
     const user = chat && chat.type === 'direct' ? chat.directUser : null;
     el('chatTitle').textContent = chat ? chat.title : '';
     const openProfile = () => { if (user && user.publicId) window.location.href = '/profile/' + encodeURIComponent(user.publicId); };
-    el('chatTitle').style.cursor = user ? 'pointer' : 'default';
-    el('chatTitle').onclick = user ? openProfile : null;
-    el('chatAvatar').style.cursor = user ? 'pointer' : 'default';
-    el('chatAvatar').onclick = user ? openProfile : null;
-    el('chatSubtitle').style.cursor = user ? 'pointer' : 'default';
-    el('chatSubtitle').onclick = user ? openProfile : null;
+    const openChannelSettings = () => { if (chat && chat.type === 'channel') openChannelAdmins(chat); };
+    const headerAction = user ? openProfile : (chat && chat.type === 'channel' ? openChannelSettings : null);
+    el('chatTitle').style.cursor = headerAction ? 'pointer' : 'default';
+    el('chatTitle').onclick = headerAction;
+    el('chatAvatar').style.cursor = headerAction ? 'pointer' : 'default';
+    el('chatAvatar').onclick = headerAction;
+    el('chatSubtitle').style.cursor = headerAction ? 'pointer' : 'default';
+    el('chatSubtitle').onclick = headerAction;
     const avatar = el('chatAvatar');
     if (user && user.avatar) avatar.innerHTML = '<img src="' + escapeHtml(user.avatar) + '" alt="">';
     else avatar.textContent = chat && chat.type === 'channel' ? '📢' : (chat && chat.title ? chat.title.slice(0,1).toUpperCase() : '');
     avatar.style.display = chat && (chat.type === 'direct' || chat.type === 'channel') ? 'flex' : 'none';
   }
+
+  async function openChannelAdmins(chat) {
+    el('channelAdminsError').textContent = '';
+    try {
+      const [membersData, adminsData] = await Promise.all([
+        api('/chats/' + encodeURIComponent(chat.id) + '/members'),
+        api('/channels/' + encodeURIComponent(chat.id) + '/admins')
+      ]);
+      const members = membersData.members || [];
+      const admins = adminsData.admins || [];
+      const select = el('channelAdminUser');
+      select.innerHTML = '';
+      members.filter(m => String(m.id) !== String(chat.ownerId)).forEach(m => {
+        const option = document.createElement('option');
+        option.value = m.id;
+        option.textContent = (m.name || m.username || 'Пользователь') + (admins.some(a => String(a.userId) === String(m.id)) ? ' · администратор' : '');
+        select.appendChild(option);
+      });
+      el('channelAdminSaveBtn').disabled = !adminsData.canManage || !select.options.length;
+      el('channelAdminSaveBtn').title = adminsData.canManage ? '' : 'Нет разрешения назначать администраторов';
+      const list = el('channelAdminsList');
+      list.innerHTML = '<strong>Текущие администраторы</strong>';
+      if (!admins.length) list.innerHTML += '<p>Пока нет назначенных администраторов.</p>';
+      admins.forEach(admin => {
+        const row = document.createElement('div');
+        row.className = 'channel-admin-row';
+        const label = document.createElement('span');
+        label.textContent = admin.name + ' (@' + admin.username + ')';
+        row.appendChild(label);
+        if (adminsData.canManage) {
+          const remove = document.createElement('button');
+          remove.type = 'button'; remove.className = 'btn-secondary'; remove.textContent = 'Снять';
+          remove.addEventListener('click', async () => {
+            try {
+              await api('/channels/' + encodeURIComponent(chat.id) + '/admins/' + encodeURIComponent(admin.userId), { method: 'DELETE' });
+              await openChannelAdmins(chat);
+            } catch (e) { el('channelAdminsError').textContent = e.message; }
+          });
+          row.appendChild(remove);
+        }
+        list.appendChild(row);
+      });
+      select.onchange = () => {
+        const admin = admins.find(x => String(x.userId) === String(select.value));
+        document.querySelectorAll('[data-admin-permission]').forEach(input => {
+          input.checked = admin ? Boolean(admin.permissions && admin.permissions[input.dataset.adminPermission]) : input.dataset.adminPermission === 'publishMessages';
+        });
+      };
+      select.dispatchEvent(new Event('change'));
+      document.querySelectorAll('[data-admin-permission]').forEach(input => { input.disabled = !adminsData.canManage; });
+      el('channelAdminsModal').classList.remove('hidden');
+    } catch (e) { alert(e.message); }
+  }
+  el('channelAdminSaveBtn').addEventListener('click', async () => {
+    const chat = state.activeChat;
+    if (!chat || chat.type !== 'channel') return;
+    const userId = el('channelAdminUser').value;
+    if (!userId) { el('channelAdminsError').textContent = 'В канале пока нет подходящих участников.'; return; }
+    const permissions = {};
+    document.querySelectorAll('[data-admin-permission]').forEach(input => permissions[input.dataset.adminPermission] = input.checked);
+    try {
+      await api('/channels/' + encodeURIComponent(chat.id) + '/admins', { method: 'POST', body: { userId, permissions } });
+      await openChannelAdmins(chat);
+    } catch (e) { el('channelAdminsError').textContent = e.message; }
+  });
 
   el('chatBackBtn').addEventListener('click', () => {
     document.getElementById('app').classList.remove('chat-open');
