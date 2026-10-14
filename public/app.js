@@ -185,10 +185,22 @@
     document.querySelectorAll('[data-nav]').forEach(a=>a.classList.toggle('active',a.dataset.nav===(location.pathname==='/settings'?'settings':'home')));
     // Keep settings inside the authenticated app instead of navigating through a fresh page load.
     const settingsNav = document.querySelector('[data-nav="settings"]');
-    if (settingsNav) settingsNav.addEventListener('click', event => { event.preventDefault(); history.replaceState({}, '', '/settings'); loadPrivacySettings(); el('twoFactorEnabledInput').checked = Boolean(state.me && state.me.twoFactorEnabled); el('privacyModal').classList.remove('hidden'); });
+    if (settingsNav && !settingsNav.dataset.settingsHandlerBound) {
+      settingsNav.dataset.settingsHandlerBound = '1';
+      settingsNav.addEventListener('click', event => {
+        event.preventDefault();
+        event.stopPropagation();
+        // Keep the authenticated app mounted; changing to /settings can make
+        // browser navigation/reloads behave like a fresh unauthenticated page.
+        history.replaceState({}, '', '/chats');
+        loadPrivacySettings();
+        el('twoFactorEnabledInput').checked = Boolean(state.me && state.me.twoFactorEnabled);
+        el('privacyModal').classList.remove('hidden');
+      });
+    }
     el('myProfileNav').onclick=e=>{e.preventDefault();location.href='/profile/'+encodeURIComponent(state.me.publicId||1)};
     el('searchOpenBtn').onclick=()=>{el('globalSearchModal').classList.remove('hidden');el('globalSearchInput').focus()};
-    el('moreOpenBtn').onclick=()=>{renderAccountList();el('moreModal').classList.remove('hidden')};
+    el('moreOpenBtn').onclick=(event)=>{event.stopPropagation();renderAccountList();el('moreModal').classList.remove('hidden')};
     el('newChatFab').onclick=()=>{el('createMenuError').textContent='';el('createMenuModal').classList.remove('hidden');el('peopleSearchInput').focus()};
     el('newGroupMenuBtn').onclick=()=>{el('createMenuModal').classList.add('hidden');el('groupModal').classList.remove('hidden')};
     el('newChannelMenuBtn').onclick=()=>{el('createMenuModal').classList.add('hidden');el('channelModal').classList.remove('hidden');el('channelError').textContent='';};
@@ -410,6 +422,16 @@
     modal.addEventListener('click', event => {
       if (event.target === modal) modal.classList.add('hidden');
     });
+  });
+  // Меню по кнопке ⋮ закрывается и при клике вне его карточки.
+  document.addEventListener('click', event => {
+    const menu = el('moreModal');
+    if (!menu || menu.classList.contains('hidden')) return;
+    if (!menu.querySelector('.modal-card').contains(event.target) &&
+        event.target !== el('moreOpenBtn') &&
+        !el('moreOpenBtn').contains(event.target)) {
+      menu.classList.add('hidden');
+    }
   });
   document.addEventListener('keydown', event => {
     if (event.key === 'Escape') {
