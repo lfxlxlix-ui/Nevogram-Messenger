@@ -50,6 +50,12 @@
   });
 
   async function tryResumeSession() {
+    if (new URLSearchParams(location.search).get('switch') === '1') {
+      localStorage.removeItem('token');
+      state.token = null;
+      history.replaceState({}, '', '/login');
+      return showAccountPickerOrAuth();
+    }
     if (!state.token) return showAccountPickerOrAuth();
     try {
       const data = await api('/me');
@@ -166,6 +172,15 @@
     accounts.unshift(a);
     localStorage.setItem('nevogramAccounts', JSON.stringify(accounts.slice(0, 3)));
   }
+  document.querySelectorAll('.add-account-link').forEach(link => {
+    link.addEventListener('click', event => {
+      event.preventDefault();
+      el('addAccountChoiceModal').classList.remove('hidden');
+    });
+  });
+  el('loginExistingAccountBtn').addEventListener('click', () => { location.href = '/login?switch=1'; });
+  el('createNewAccountBtn').addEventListener('click', () => { location.href = '/register'; });
+
   function setupNavigation(){
     document.querySelectorAll('[data-nav]').forEach(a=>a.classList.toggle('active',a.dataset.nav===(location.pathname==='/settings'?'settings':'home')));
     el('myProfileNav').onclick=e=>{e.preventDefault();location.href='/profile/'+encodeURIComponent(state.me.publicId||1)};
