@@ -238,7 +238,7 @@ function chatPreview(chat, userId) {
     ...(directUser ? { directUser } : {}),
     lastMessage: last ? { text: last.text, createdAt: last.createdAt, senderId: last.senderId } : null,
     unread,
-    ...(chat.type === 'channel' ? { username: chat.username || null, description: chat.description || '', isPublic: Boolean(chat.isPublic), ownerId: chat.ownerId, subscriberCount: chat.memberIds.length, canPost: chat.ownerId === userId || (chat.admins || []).some(a => a.userId === userId && a.permissions?.publishMessages) || (chat.adminIds || []).includes(userId), isOwner: chat.ownerId === userId, isAdmin: (chat.admins || []).some(a => a.userId === userId) || (chat.adminIds || []).includes(userId), adminPermissions: (chat.admins || []).find(a => a.userId === userId)?.permissions || ((chat.adminIds || []).includes(userId) ? { publishMessages: true, deleteMessages: true, editMessages: true, changeProfile: false, manageAdmins: false, voiceChat: true } : {}), voiceActive: typeof activeVoiceChats !== 'undefined' && activeVoiceChats.has(chat.id) } : {})
+    ...(chat.type === 'channel' ? { username: chat.username || null, description: chat.description || '', isPublic: Boolean(chat.isPublic), ownerId: chat.ownerId, subscriberCount: chat.memberIds.length, canPost: chat.ownerId === userId || (chat.admins || []).some(a => a.userId === userId && a.permissions?.publishMessages) || (chat.adminIds || []).includes(userId), isOwner: chat.ownerId === userId, isAdmin: (chat.admins || []).some(a => a.userId === userId) || (chat.adminIds || []).includes(userId), adminPermissions: (chat.admins || []).find(a => a.userId === userId)?.permissions || ((chat.adminIds || []).includes(userId) ? { publishMessages: true, deleteMessages: false, editMessages: false, changeProfile: false, manageAdmins: false, voiceChat: false } : {}), voiceActive: typeof activeVoiceChats !== 'undefined' && activeVoiceChats.has(chat.id) } : {})
   };
 }
 
@@ -432,13 +432,13 @@ const CHANNEL_PERMISSIONS = ['publishMessages', 'deleteMessages', 'editMessages'
 function findChannel(id) { return state.chats.find(c => c.id === id && c.type === 'channel'); }
 function channelPermission(chat, userId, permission) {
   if (chat.ownerId === userId) return true;
-  if ((chat.adminIds || []).includes(userId)) return true; // совместимость со старыми каналами
+  if ((chat.adminIds || []).includes(userId)) return permission === 'publishMessages'; // старые администраторы сохраняют только публикацию
   const admin = (chat.admins || []).find(a => a.userId === userId);
   return Boolean(admin && admin.permissions && admin.permissions[permission]);
 }
 function canManageChannel(chat, userId) { return chat.ownerId === userId || channelPermission(chat, userId, 'manageAdmins'); }
-function canEditChannelMessage(chat, userId) { return chat.ownerId === userId || (chat.adminIds || []).includes(userId) || (chat.admins || []).some(a => a.userId === userId && a.permissions?.editMessages); }
-function canDeleteChannelMessage(chat, userId) { return chat.ownerId === userId || (chat.adminIds || []).includes(userId) || (chat.admins || []).some(a => a.userId === userId && a.permissions?.deleteMessages); }
+function canEditChannelMessage(chat, userId) { return chat.ownerId === userId || (chat.admins || []).some(a => a.userId === userId && a.permissions?.editMessages); }
+function canDeleteChannelMessage(chat, userId) { return chat.ownerId === userId || (chat.admins || []).some(a => a.userId === userId && a.permissions?.deleteMessages); }
 app.get('/api/channels/:id/admins', authMiddleware, (req, res) => {
   const chat = findChannel(req.params.id);
   if (!chat || !chat.memberIds.includes(req.user.id)) return res.status(404).json({ error: 'Канал не найден' });
