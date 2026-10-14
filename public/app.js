@@ -38,7 +38,9 @@
         twoFactorCode: el('twoFactorInput').value.trim()
       }});
       if (data.requiresTwoFactor) {
-        el('authError').textContent = 'Введите секретный код 2FA в поле ниже и нажмите «Войти» ещё раз.';
+        el('twoFactorInput').hidden = false;
+        el('twoFactorInput').setAttribute('aria-label', 'Секретный код двухфакторной защиты');
+        el('authError').textContent = 'Для этого аккаунта включена 2FA. Введите секретный код и нажмите «Войти» ещё раз.';
         el('twoFactorInput').focus();
         return;
       }
@@ -79,6 +81,7 @@
     el('usernameInput').value = username;
     el('passwordInput').value = '';
     el('twoFactorInput').value = '';
+    el('twoFactorInput').hidden = true;
     el('authError').textContent = '';
     if (username) el('passwordInput').focus();
   }
