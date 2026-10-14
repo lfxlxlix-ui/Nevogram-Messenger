@@ -136,3 +136,8 @@ html, body {
   .privacy-row { font-size:13px; }
   .privacy-row select { max-width:105px; }
 }
+
+/* Sidebar top bar: brand on the left, search and menu on the right */
+.topbar { justify-content: space-between; }
+.brand-title { margin-right: auto; }
+.topbar-actions { display: flex; align-items: center; gap: 8px; }
