@@ -185,19 +185,10 @@
     document.querySelectorAll('[data-nav]').forEach(a=>a.classList.toggle('active',a.dataset.nav===(location.pathname==='/settings'?'settings':'home')));
     // Keep settings inside the authenticated app instead of navigating through a fresh page load.
     const settingsNav = document.querySelector('[data-nav="settings"]');
-    if (settingsNav && !settingsNav.dataset.settingsHandlerBound) {
-      settingsNav.dataset.settingsHandlerBound = '1';
-      settingsNav.addEventListener('click', event => {
-        event.preventDefault();
-        event.stopPropagation();
-        // Keep the authenticated app mounted; changing to /settings can make
-        // browser navigation/reloads behave like a fresh unauthenticated page.
-        history.replaceState({}, '', '/chats');
-        loadPrivacySettings();
-        el('twoFactorEnabledInput').checked = Boolean(state.me && state.me.twoFactorEnabled);
-        el('privacyModal').classList.remove('hidden');
-      });
-    }
+    if (settingsNav) settingsNav.addEventListener('click', event => {
+      event.preventDefault();
+      window.location.href = '/settings';
+    });
     el('myProfileNav').onclick=e=>{e.preventDefault();location.href='/profile/'+encodeURIComponent(state.me.publicId||1)};
     el('searchOpenBtn').onclick=()=>{el('globalSearchModal').classList.remove('hidden');el('globalSearchInput').focus()};
     el('moreOpenBtn').onclick=(event)=>{event.stopPropagation();renderAccountList();el('moreModal').classList.remove('hidden')};
