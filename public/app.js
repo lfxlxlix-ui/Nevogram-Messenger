@@ -1,8 +1,7 @@
 (() => {
-  // Keep authentication only for this browser tab/session; never persist the token across browser sessions.
-  localStorage.removeItem('token');
+  // Keep a session token in both stores so refreshes and account restore stay consistent.
   const state = {
-    token: sessionStorage.getItem('token') || null,
+    token: sessionStorage.getItem('token') || localStorage.getItem('token') || null,
     me: null,
     chats: [],
     activeChat: null,
@@ -50,6 +49,7 @@
       }
       state.token = data.token;
       sessionStorage.setItem('token', data.token);
+      localStorage.setItem('token', data.token);
       state.me = data.user;
       startApp();
     } catch (err) {
@@ -60,6 +60,7 @@
   async function tryResumeSession() {
     if (new URLSearchParams(location.search).get('switch') === '1') {
       localStorage.removeItem('token');
+      sessionStorage.removeItem('token');
       state.token = null;
       history.replaceState({}, '', '/login');
       return showAccountPickerOrAuth();
@@ -72,6 +73,7 @@
     } catch (e) {
       if (e.status === 401) {
         sessionStorage.removeItem('token');
+        localStorage.removeItem('token');
         state.token = null;
         showAccountPickerOrAuth();
       } else {
@@ -233,7 +235,7 @@
     }
     localStorage.setItem('nevogramAccounts',JSON.stringify(accounts));
     const box=el('accountList');box.innerHTML='<p class="account-heading">Аккаунты ('+accounts.length+'/3)</p>'+accounts.map(a=>'<div class="account-row"><button type="button" class="account-option" data-account="'+escapeHtml(a.id)+'">'+escapeHtml(a.name||a.username)+' <small>@'+escapeHtml(a.username)+'</small></button><button type="button" class="remove-saved-account" data-remove-account="'+escapeHtml(a.id)+'" aria-label="Убрать аккаунт из списка" title="Убрать из списка">×</button></div>').join('')+(accounts.length>=3?'<p class="search-empty">Достигнут лимит: 3 аккаунта</p>':'<a class="add-account-link" href="#addAccountChoice">＋ Добавить аккаунт</a>');
-    box.querySelectorAll('[data-account]').forEach(b=>b.onclick=()=>{const a=accounts.find(x=>String(x.id)===b.dataset.account);if(a){sessionStorage.setItem('token',a.token);location.href='/chats'}});
+    box.querySelectorAll('[data-account]').forEach(b=>b.onclick=()=>{const a=accounts.find(x=>String(x.id)===b.dataset.account);if(a){sessionStorage.setItem('token',a.token);localStorage.setItem('token',a.token);location.href='/chats'}});
     box.querySelectorAll('[data-remove-account]').forEach(b=>b.onclick=(event)=>{event.stopPropagation();const account=accounts.find(x=>String(x.id)===b.dataset.removeAccount);if(!account)return;if(!confirm('Убрать аккаунт @'+(account.username||account.name)+' из списка переключения?'))return;const remaining=normalizeAccounts(accounts).filter(x=>String(x.id)!==String(account.id));localStorage.setItem('nevogramAccounts',JSON.stringify(remaining));renderAccountList();});
   }
 
