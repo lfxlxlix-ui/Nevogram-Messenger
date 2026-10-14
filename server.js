@@ -52,7 +52,7 @@ app.get('/profile/:profileId', (req, res) => {
   const name = esc(user.name || user.username || user.email);
   const publicId = esc(user.publicId || state.users.indexOf(user) + 1);
   const avatar = typeof user.avatar === 'string' && user.avatar.startsWith('data:image/') ? user.avatar : '';
-  const banner = typeof user.banner === 'string' && /^data:(image\\/(jpeg|png|webp|gif)|video\\/(mp4|webm|quicktime));base64,/.test(user.banner) ? user.banner : '';
+  const banner = typeof user.banner === 'string' && /^data:(image\/(jpeg|png|webp|gif)|video\/(mp4|webm|quicktime));base64,/.test(user.banner) ? user.banner : '';
   const coverMarkup = banner.startsWith('data:video/') ? '<video class="profile-cover-media" autoplay muted loop playsinline src="' + banner + '"></video>' : '';
   const coverStyle = banner.startsWith('data:image/') ? ' style="background-image:url(&quot;' + banner + '&quot;);background-size:cover;background-position:center"' : '';
   const lastSeen = onlineUsers.get(user.id)?.size ? 'В сети' : (user.lastSeenAt ? 'Был(а) в сети ' + new Date(user.lastSeenAt).toLocaleString('ru-RU', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) : 'Время последнего посещения неизвестно');
