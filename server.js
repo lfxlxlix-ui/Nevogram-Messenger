@@ -238,7 +238,7 @@ function chatPreview(chat, userId) {
     ...(directUser ? { directUser } : {}),
     lastMessage: last ? { text: last.text, createdAt: last.createdAt, senderId: last.senderId } : null,
     unread,
-    ...(chat.type === 'channel' ? { username: chat.username || null, description: chat.description || '', isPublic: Boolean(chat.isPublic), ownerId: chat.ownerId, subscriberCount: chat.memberIds.length, canPost: chat.ownerId === userId || (chat.admins || []).some(a => a.userId === userId && a.permissions?.publishMessages) || (chat.adminIds || []).includes(userId), isOwner: chat.ownerId === userId, isAdmin: (chat.admins || []).some(a => a.userId === userId) || (chat.adminIds || []).includes(userId) } : {})
+    ...(chat.type === 'channel' ? { username: chat.username || null, description: chat.description || '', isPublic: Boolean(chat.isPublic), ownerId: chat.ownerId, subscriberCount: chat.memberIds.length, canPost: chat.ownerId === userId || (chat.admins || []).some(a => a.userId === userId && a.permissions?.publishMessages) || (chat.adminIds || []).includes(userId), isOwner: chat.ownerId === userId, isAdmin: (chat.admins || []).some(a => a.userId === userId) || (chat.adminIds || []).includes(userId), voiceActive: typeof activeVoiceChats !== 'undefined' && activeVoiceChats.has(chat.id) } : {})
   };
 }
 
@@ -345,6 +345,7 @@ function channelPublicInfo(chat, userId) {
     isMember: chat.memberIds.includes(userId),
     canPost: chat.ownerId === userId || (chat.admins || []).some(a => a.userId === userId && a.permissions?.publishMessages) || (chat.adminIds || []).includes(userId),
     isOwner: chat.ownerId === userId,
+    voiceActive: typeof activeVoiceChats !== 'undefined' && activeVoiceChats.has(chat.id),
     isAdmin: (chat.admins || []).some(a => a.userId === userId) || (chat.adminIds || []).includes(userId),
     adminPermissions: (chat.admins || []).find(a => a.userId === userId)?.permissions || ((chat.adminIds || []).includes(userId) ? { publishMessages: true, deleteMessages: true, editMessages: true, changeProfile: false, manageAdmins: false, voiceChat: true } : {}),
     inviteCode: chat.isPublic ? null : (chat.ownerId === userId ? chat.inviteCode : null)
