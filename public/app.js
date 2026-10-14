@@ -174,11 +174,13 @@
     accounts.unshift(a);
     localStorage.setItem('nevogramAccounts', JSON.stringify(accounts.slice(0, 3)));
   }
-  document.querySelectorAll('.add-account-link').forEach(link => {
-    link.addEventListener('click', event => {
-      event.preventDefault();
-      el('addAccountChoiceModal').classList.remove('hidden');
-    });
+  // Delegation also handles the Add account link rendered dynamically inside the three-dots menu.
+  document.addEventListener('click', event => {
+    const link = event.target.closest('.add-account-link');
+    if (!link) return;
+    event.preventDefault();
+    const choiceModal = el('addAccountChoiceModal');
+    if (choiceModal) choiceModal.classList.remove('hidden');
   });
   el('loginExistingAccountBtn').addEventListener('click', () => { location.href = '/cananl?switch=1'; });
   el('createNewAccountBtn').addEventListener('click', () => { location.href = '/cananr'; });
@@ -215,7 +217,7 @@
       accounts = accounts.slice(0, 3);
     }
     localStorage.setItem('nevogramAccounts',JSON.stringify(accounts));
-    const box=el('accountList');box.innerHTML='<p class="account-heading">Аккаунты ('+accounts.length+'/3)</p>'+accounts.map(a=>'<div class="account-row"><button type="button" class="account-option" data-account="'+escapeHtml(a.id)+'">'+escapeHtml(a.name||a.username)+' <small>@'+escapeHtml(a.username)+'</small></button><button type="button" class="remove-saved-account" data-remove-account="'+escapeHtml(a.id)+'" aria-label="Убрать аккаунт из списка" title="Убрать из списка">×</button></div>').join('')+(accounts.length>=3?'<p class="search-empty">Достигнут лимит: 3 аккаунта</p>':'<a class="add-account-link" href="/canan">＋ Добавить аккаунт</a>');
+    const box=el('accountList');box.innerHTML='<p class="account-heading">Аккаунты ('+accounts.length+'/3)</p>'+accounts.map(a=>'<div class="account-row"><button type="button" class="account-option" data-account="'+escapeHtml(a.id)+'">'+escapeHtml(a.name||a.username)+' <small>@'+escapeHtml(a.username)+'</small></button><button type="button" class="remove-saved-account" data-remove-account="'+escapeHtml(a.id)+'" aria-label="Убрать аккаунт из списка" title="Убрать из списка">×</button></div>').join('')+(accounts.length>=3?'<p class="search-empty">Достигнут лимит: 3 аккаунта</p>':'<a class="add-account-link" href="#addAccountChoice">＋ Добавить аккаунт</a>');
     box.querySelectorAll('[data-account]').forEach(b=>b.onclick=()=>{const a=accounts.find(x=>String(x.id)===b.dataset.account);if(a){sessionStorage.setItem('token',a.token);location.href='/chats'}});
     box.querySelectorAll('[data-remove-account]').forEach(b=>b.onclick=(event)=>{event.stopPropagation();const account=accounts.find(x=>String(x.id)===b.dataset.removeAccount);if(!account)return;if(!confirm('Убрать аккаунт @'+(account.username||account.name)+' из списка переключения?'))return;const remaining=normalizeAccounts(accounts).filter(x=>String(x.id)!==String(account.id));localStorage.setItem('nevogramAccounts',JSON.stringify(remaining));renderAccountList();});
   }
