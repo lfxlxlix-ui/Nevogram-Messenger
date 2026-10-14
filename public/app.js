@@ -370,6 +370,7 @@
 
   let voiceChatId = null;
   let voiceStream = null;
+  let voiceIsHost = false;
   const voicePeers = new Map();
   async function startVoiceChat() {
     const chat = state.activeChat;
@@ -377,6 +378,7 @@
     try {
       voiceStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
       voiceChatId = chat.id;
+      voiceIsHost = true;
       el('voiceStartBtn').classList.add('hidden');
       el('voiceLeaveBtn').classList.remove('hidden');
       el('voiceStatus').textContent = 'Подключение к голосовому чату…';
@@ -385,7 +387,7 @@
   }
   async function joinVoiceChat() {
     const chat=state.activeChat;if(!chat||chat.type!=='channel')return;
-    try { voiceStream=await navigator.mediaDevices.getUserMedia({audio:true,video:false}); voiceChatId=chat.id;el('voiceJoinBtn').classList.add('hidden');el('voiceStartBtn').classList.add('hidden');el('voiceLeaveBtn').classList.remove('hidden');el('voiceStatus').textContent='Подключение…';state.socket.emit('voice:join',{chatId:chat.id}); }
+    try { voiceStream=await navigator.mediaDevices.getUserMedia({audio:true,video:false}); voiceChatId=chat.id;voiceIsHost=false;el('voiceJoinBtn').classList.add('hidden');el('voiceStartBtn').classList.add('hidden');el('voiceLeaveBtn').classList.remove('hidden');el('voiceStatus').textContent='Подключение…';state.socket.emit('voice:join',{chatId:chat.id}); }
     catch(e){el('voiceStatus').textContent='Нет доступа к микрофону: '+e.message;}
   }
   function getVoicePeer(peerId) {
@@ -409,12 +411,12 @@
     el('voiceAudios').innerHTML='';el('voiceLeaveBtn').classList.add('hidden');
     const chat=state.activeChat;el('voiceStartBtn').classList.toggle('hidden',!(chat && (chat.isOwner || chat.adminPermissions?.voiceChat)));
     el('voiceJoinBtn').classList.toggle('hidden',!(chat && chat.type === 'channel'));
-    voiceChatId=null;
+    voiceChatId=null;voiceIsHost=false;
   }
   el('channelAdminsOpenBtn').addEventListener('click',()=>{if(state.activeChat)openChannelAdmins(state.activeChat);});
   el('voiceStartBtn').addEventListener('click',startVoiceChat);
   el('voiceJoinBtn').addEventListener('click',joinVoiceChat);
-  el('voiceLeaveBtn').addEventListener('click',()=>{if(voiceChatId)state.socket.emit('voice:stop',{chatId:voiceChatId});leaveVoiceLocal();});
+  el('voiceLeaveBtn').addEventListener('click',()=>{if(voiceChatId && voiceIsHost)state.socket.emit('voice:stop',{chatId:voiceChatId});leaveVoiceLocal();});
 
   async function openChannelAdmins(chat) {
     el('channelAdminsError').textContent = '';
