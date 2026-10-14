@@ -238,7 +238,7 @@ function chatPreview(chat, userId) {
     ...(directUser ? { directUser } : {}),
     lastMessage: last ? { text: last.text, createdAt: last.createdAt, senderId: last.senderId } : null,
     unread,
-    ...(chat.type === 'channel' ? { username: chat.username || null, description: chat.description || '', isPublic: Boolean(chat.isPublic), ownerId: chat.ownerId, subscriberCount: chat.memberIds.length, canPost: chat.ownerId === userId || (chat.adminIds || []).includes(userId) } : {})
+    ...(chat.type === 'channel' ? { username: chat.username || null, description: chat.description || '', isPublic: Boolean(chat.isPublic), ownerId: chat.ownerId, subscriberCount: chat.memberIds.length, canPost: chat.ownerId === userId || (chat.admins || []).some(a => a.userId === userId && a.permissions?.publishMessages) || (chat.adminIds || []).includes(userId), isOwner: chat.ownerId === userId, isAdmin: (chat.admins || []).some(a => a.userId === userId) || (chat.adminIds || []).includes(userId) } : {})
   };
 }
 
@@ -343,7 +343,10 @@ function channelPublicInfo(chat, userId) {
     description: chat.description || '', isPublic: Boolean(chat.isPublic),
     ownerId: chat.ownerId, subscriberCount: chat.memberIds.length,
     isMember: chat.memberIds.includes(userId),
-    canPost: chat.ownerId === userId || (chat.adminIds || []).includes(userId),
+    canPost: chat.ownerId === userId || (chat.admins || []).some(a => a.userId === userId && a.permissions?.publishMessages) || (chat.adminIds || []).includes(userId),
+    isOwner: chat.ownerId === userId,
+    isAdmin: (chat.admins || []).some(a => a.userId === userId) || (chat.adminIds || []).includes(userId),
+    adminPermissions: (chat.admins || []).find(a => a.userId === userId)?.permissions || ((chat.adminIds || []).includes(userId) ? { publishMessages: true, deleteMessages: true, editMessages: true, changeProfile: false, manageAdmins: false, voiceChat: true } : {}),
     inviteCode: chat.isPublic ? null : (chat.ownerId === userId ? chat.inviteCode : null)
   };
 }
@@ -410,7 +413,7 @@ app.get('/api/channels/:id/invite', authMiddleware, (req, res) => {
 function locationForInvite(chat) { return chat.isPublic ? '/?channel=' + encodeURIComponent(chat.username) : '/?invite=' + encodeURIComponent(chat.id + '.' + chat.inviteCode); }
 app.patch('/api/channels/:id', authMiddleware, (req, res) => {
   const chat = state.chats.find(c => c.id === req.params.id && c.type === 'channel');
-  if (!chat || chat.ownerId !== req.user.id) return res.status(403).json({ error: 'Только владелец может менять настройки канала' });
+  if (!chat || (chat.ownerId !== req.user.id && !(chat.admins || []).some(a => a.userId === req.user.id && a.permissions?.changeProfile))) return res.status(403).json({ error: 'Нет разрешения менять настройки канала' });
   const body = req.body || {};
   if (body.name !== undefined) {
     const name = String(body.name || '').trim();
@@ -420,6 +423,56 @@ app.patch('/api/channels/:id', authMiddleware, (req, res) => {
   if (body.description !== undefined) chat.description = String(body.description || '').trim().slice(0, 500);
   save();
   res.json({ channel: channelPublicInfo(chat, req.user.id) });
+});
+
+
+/* ---------- Управление администраторами и разрешениями канала ---------- */
+const CHANNEL_PERMISSIONS = ['publishMessages', 'deleteMessages', 'editMessages', 'changeProfile', 'manageAdmins', 'voiceChat'];
+function findChannel(id) { return state.chats.find(c => c.id === id && c.type === 'channel'); }
+function channelPermission(chat, userId, permission) {
+  if (chat.ownerId === userId) return true;
+  if ((chat.adminIds || []).includes(userId)) return true; // совместимость со старыми каналами
+  const admin = (chat.admins || []).find(a => a.userId === userId);
+  return Boolean(admin && admin.permissions && admin.permissions[permission]);
+}
+function canManageChannel(chat, userId) { return chat.ownerId === userId || channelPermission(chat, userId, 'manageAdmins'); }
+app.get('/api/channels/:id/admins', authMiddleware, (req, res) => {
+  const chat = findChannel(req.params.id);
+  if (!chat || !chat.memberIds.includes(req.user.id)) return res.status(404).json({ error: 'Канал не найден' });
+  const admins = (chat.admins || []).map(a => {
+    const u = state.users.find(x => x.id === a.userId);
+    return { userId: a.userId, username: u?.username || u?.email || 'Пользователь', name: u?.name || u?.username || 'Пользователь', permissions: a.permissions || {} };
+  });
+  res.json({ admins, canManage: canManageChannel(chat, req.user.id), isOwner: chat.ownerId === req.user.id });
+});
+app.post('/api/channels/:id/admins', authMiddleware, (req, res) => {
+  const chat = findChannel(req.params.id);
+  if (!chat) return res.status(404).json({ error: 'Канал не найден' });
+  if (!canManageChannel(chat, req.user.id)) return res.status(403).json({ error: 'Нет разрешения назначать администраторов' });
+  const body = req.body || {};
+  const userId = String(body.userId || '');
+  if (!chat.memberIds.includes(userId)) return res.status(400).json({ error: 'Пользователь должен быть подписчиком канала' });
+  if (userId === chat.ownerId) return res.status(400).json({ error: 'Владелец уже имеет все разрешения' });
+  if (!Array.isArray(chat.admins)) chat.admins = [];
+  const permissions = {};
+  CHANNEL_PERMISSIONS.forEach(p => permissions[p] = Boolean(body.permissions && body.permissions[p]));
+  const existing = chat.admins.find(a => a.userId === userId);
+  if (existing) existing.permissions = permissions;
+  else chat.admins.push({ userId, permissions, createdAt: Date.now(), appointedBy: req.user.id });
+  // Legacy admin list remains for old clients; new permissions are enforced by the current server.
+  chat.adminIds = (chat.adminIds || []).filter(id => id !== userId);
+  save();
+  res.json({ ok: true, admins: chat.admins });
+});
+app.delete('/api/channels/:id/admins/:userId', authMiddleware, (req, res) => {
+  const chat = findChannel(req.params.id);
+  if (!chat) return res.status(404).json({ error: 'Канал не найден' });
+  if (!canManageChannel(chat, req.user.id)) return res.status(403).json({ error: 'Нет разрешения снимать администраторов' });
+  if (req.params.userId === chat.ownerId) return res.status(400).json({ error: 'Нельзя снять владельца канала' });
+  chat.admins = (chat.admins || []).filter(a => a.userId !== req.params.userId);
+  chat.adminIds = (chat.adminIds || []).filter(id => id !== req.params.userId);
+  save();
+  res.json({ ok: true });
 });
 
 // ---------- Админка: инвайт-коды, пользователи и заявки на верификацию ----------
@@ -637,7 +690,7 @@ io.on('connection', (socket) => {
       socket.emit('message:error', { error: 'Вам временно запрещено отправлять сообщения' });
       return;
     }
-    if (chat.type === 'channel' && chat.ownerId !== socket.userId && !(chat.adminIds || []).includes(socket.userId)) return;
+    if (chat.type === 'channel' && chat.ownerId !== socket.userId && !(chat.adminIds || []).includes(socket.userId) && !(chat.admins || []).some(a => a.userId === socket.userId && a.permissions?.publishMessages)) return;
     const clean = String(text || '').trim().slice(0, 4000);
     if (!clean) return;
     const msg = {
