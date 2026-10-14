@@ -360,6 +360,8 @@
       bar.classList.toggle('hidden', !chat || chat.type !== 'channel');
       if (chat && chat.type === 'channel') {
         el('channelAdminsOpenBtn').classList.toggle('hidden', !(chat.isOwner || chat.isAdmin || chat.adminPermissions?.manageAdmins));
+        el('channelInviteBtn').classList.toggle('hidden', !chat.isOwner);
+        el('channelLeaveBtn').classList.toggle('hidden', Boolean(chat.isOwner));
         el('voiceStartBtn').classList.toggle('hidden', !(chat.isOwner || chat.adminPermissions?.voiceChat));
         el('voiceLeaveBtn').classList.add('hidden');
         el('voiceJoinBtn').classList.toggle('hidden', !chat.voiceActive);
@@ -414,6 +416,8 @@
     voiceChatId=null;voiceIsHost=false;
   }
   el('channelAdminsOpenBtn').addEventListener('click',()=>{if(state.activeChat)openChannelAdmins(state.activeChat);});
+  el('channelInviteBtn').addEventListener('click',async()=>{const chat=state.activeChat;if(!chat||chat.type!=='channel'||!chat.isOwner)return;try{const d=await api('/channels/'+encodeURIComponent(chat.id)+'/invite');const link=location.origin+d.link;try{await navigator.clipboard.writeText(link);alert('Ссылка-приглашение скопирована:\n'+link);}catch(_){prompt('Скопируй ссылку-приглашение:',link);}}catch(e){alert(e.message);}});
+  el('channelLeaveBtn').addEventListener('click',async()=>{const chat=state.activeChat;if(!chat||chat.type!=='channel'||chat.isOwner)return;if(!confirm('Отписаться от канала «'+chat.title+'»?'))return;try{await api('/channels/'+encodeURIComponent(chat.id)+'/leave',{method:'POST'});state.activeChat=null;el('chatView').classList.add('hidden');el('emptyState').classList.remove('hidden');document.getElementById('app').classList.remove('chat-open');await loadChats();}catch(e){alert(e.message);}});
   el('voiceStartBtn').addEventListener('click',startVoiceChat);
   el('voiceJoinBtn').addEventListener('click',joinVoiceChat);
   el('voiceLeaveBtn').addEventListener('click',()=>{if(voiceChatId && voiceIsHost)state.socket.emit('voice:stop',{chatId:voiceChatId});leaveVoiceLocal();});
