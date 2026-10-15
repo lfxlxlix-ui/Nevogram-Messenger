@@ -17,7 +17,7 @@ app.use(express.json({ limit: '12mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.get(['/register', '/cananr'], (req, res) => res.sendFile(path.join(__dirname, 'public', 'register.html')));
 app.get('/settings', (req, res) => res.sendFile(path.join(__dirname, 'public', 'settings.html')));
-app.get(['/nevogiftsdemo', '/bb', '/br', '/bri', '/bg', '/bc', '/bh', '/bro'], (req, res) => res.sendFile(path.join(__dirname, 'public', 'nevogiftsdemo.html')));
+app.get(['/nevogiftsdemo', '/nevogiftsdemo/bb', '/nevogiftsdemo/br', '/nevogiftsdemo/bri', '/nevogiftsdemo/bg', '/nevogiftsdemo/bc', '/nevogiftsdemo/bh', '/nevogiftsdemo/bro'], (req, res) => res.sendFile(path.join(__dirname, 'public', 'nevogiftsdemo.html')));
 app.get(['/login', '/cananl', '/home', '/chats'], (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 app.get(['/cp', '/editprofile'], (req, res) => {
