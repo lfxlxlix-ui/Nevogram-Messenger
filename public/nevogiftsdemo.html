@@ -32,13 +32,12 @@
 </div>
 <script>
 const gifts=[
-{id:'star',name:'Звёздный кот',emoji:'🐱',price:180,rarity:'Редкий',desc:'Маленькая звезда твоей коллекции',popular:1},
-{id:'rose',name:'Хрустальная роза',emoji:'🌹',price:320,rarity:'Эпический',desc:'Красота, застывшая во времени',popular:2,gold:true},
-{id:'rocket',name:'Космический полёт',emoji:'🚀',price:250,rarity:'Редкий',desc:'Подарок с космическим настроением',popular:3},
-{id:'crown',name:'Золотая корона',emoji:'👑',price:640,rarity:'Легендарный',desc:'Для особенного момента',popular:4,gold:true},
-{id:'bear',name:'Мишка-почтальон',emoji:'🧸',price:150,rarity:'Обычный',desc:'Тёплый привет в виде подарка',popular:6},
-{id:'moon',name:'Лунный шар',emoji:'🌙',price:290,rarity:'Редкий',desc:'Кусочек тихой ночи',popular:7},
-{id:'cake',name:'Праздничный торт',emoji:'🎂',price:210,rarity:'Обычный',desc:'Повод для маленького праздника',popular:8}
+{id:'bear',name:'Мишка',emoji:'🧸',price:150,rarity:'Обычный',desc:'Милый подарок для себя или друга',popular:1},
+{id:'ring',name:'Кольцо',emoji:'💍',price:320,rarity:'Редкий',desc:'Особенный знак внимания',popular:2,gold:true},
+{id:'rocket',name:'Ракета',emoji:'🚀',price:250,rarity:'Редкий',desc:'Подарок с космическим настроением',popular:3},
+{id:'heart',name:'Сердечко',emoji:'❤️',price:180,rarity:'Обычный',desc:'Тёплый знак внимания',popular:4},
+{id:'cake',name:'Тортик',emoji:'🎂',price:210,rarity:'Обычный',desc:'Повод для маленького праздника',popular:5},
+{id:'gift',name:'Подарок',emoji:'🎁',price:290,rarity:'Эпический',desc:'Сюрприз в красивой упаковке',popular:6,gold:true}
 ];
 let balance=1250,collection=[],history=[],tab='market',purchaseGift=null,purchaseMode='self',selectedUser=null;const demoUsers=[{username:'alex',name:'Алекс',avatar:'A'},{username:'maria',name:'Мария',avatar:'М'},{username:'max_nevo',name:'Макс',avatar:'M'},{username:'sophie',name:'Софи',avatar:'S'},{username:'danil',name:'Данил',avatar:'Д'}];
 const $=id=>document.getElementById(id);
