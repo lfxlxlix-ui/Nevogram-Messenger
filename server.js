@@ -149,6 +149,80 @@ app.post('/api/register', async (req, res) => {
   res.json({ ok: true, token: sign({ userId: newUser.id }), user: publicUser(newUser) });
 });
 
+// ---------- Nevogram Gifts: persistent account-bound gifts and balance ----------
+const GIFT_CATALOG = [
+  { id: 'bear', name: 'Мишка', emoji: '🧸', price: 150, rarity: 'Обычный', desc: 'Милый подарок для себя или друга', popular: 1 },
+  { id: 'ring', name: 'Кольцо', emoji: '💍', price: 320, rarity: 'Редкий', desc: 'Особенный знак внимания', popular: 2, gold: true },
+  { id: 'rocket', name: 'Ракета', emoji: '🚀', price: 250, rarity: 'Редкий', desc: 'Подарок с космическим настроением', popular: 3 },
+  { id: 'heart', name: 'Сердечко', emoji: '❤️', price: 180, rarity: 'Обычный', desc: 'Тёплый знак внимания', popular: 4 },
+  { id: 'cake', name: 'Тортик', emoji: '🎂', price: 210, rarity: 'Обычный', desc: 'Повод для маленького праздника', popular: 5 },
+  { id: 'gift', name: 'Подарок', emoji: '🎁', price: 290, rarity: 'Эпический', desc: 'Сюрприз в красивой упаковке', popular: 6, gold: true }
+];
+function ensureGiftAccount(user) {
+  if (!Number.isSafeInteger(user.nevocoins) || user.nevocoins < 0) user.nevocoins = 0;
+  if (!Array.isArray(user.giftCollection)) user.giftCollection = [];
+  if (!Array.isArray(user.giftHistory)) user.giftHistory = [];
+}
+function giftAccountResponse(user) {
+  ensureGiftAccount(user);
+  return { balance: user.nevocoins, gifts: GIFT_CATALOG, collection: user.giftCollection, history: user.giftHistory };
+}
+app.get('/api/gifts/state', authMiddleware, (req, res) => {
+  ensureGiftAccount(req.user);
+  save();
+  res.json(giftAccountResponse(req.user));
+});
+app.post('/api/gifts/buy', authMiddleware, (req, res) => {
+  const body = req.body || {};
+  const gift = GIFT_CATALOG.find(g => g.id === String(body.giftId || ''));
+  if (!gift) return res.status(400).json({ error: 'Неизвестный подарок' });
+  ensureGiftAccount(req.user);
+  const recipientUsername = String(body.recipientUsername || '').trim().replace(/^@/, '').toLowerCase();
+  let recipient = null;
+  if (recipientUsername) {
+    recipient = state.users.find(u => u.id !== req.user.id && String(u.username || u.email || '').toLowerCase() === recipientUsername);
+    if (!recipient) return res.status(404).json({ error: 'Пользователь не найден' });
+    ensureGiftAccount(recipient);
+  }
+  if (req.user.nevocoins < gift.price) return res.status(409).json({ error: 'Недостаточно Nevocoins' });
+  const now = Date.now();
+  const instanceId = nanoid();
+  req.user.nevocoins -= gift.price;
+  if (recipient) {
+    const received = { ...gift, instanceId, ownerName: req.user.name || req.user.username, ownerUsername: req.user.username || req.user.email, senderId: req.user.id, receivedAt: now, purchasePrice: gift.price, sellableUntil: now + 7 * 86400000 };
+    recipient.giftCollection.push(received);
+    recipient.giftHistory.push({ id: nanoid(), emoji: gift.emoji, title: gift.name, date: now, action: 'Получен подарок от @' + (req.user.username || req.user.email), amount: '🎁', giftInstanceId: instanceId });
+    req.user.giftHistory.push({ id: nanoid(), emoji: gift.emoji, title: gift.name, date: now, action: 'Подарок для @' + recipientUsername, amount: '−◈ ' + gift.price, giftInstanceId: instanceId });
+  } else {
+    req.user.giftCollection.push({ ...gift, instanceId, ownerName: 'Вы', ownerUsername: req.user.username || req.user.email, receivedAt: now, purchasePrice: gift.price, sellableUntil: now + 7 * 86400000 });
+    req.user.giftHistory.push({ id: nanoid(), emoji: gift.emoji, title: gift.name, date: now, action: 'Покупка себе', amount: '−◈ ' + gift.price, giftInstanceId: instanceId });
+  }
+  save();
+  res.status(201).json({ ...giftAccountResponse(req.user), message: recipient ? 'Подарок отправлен' : 'Подарок добавлен в коллекцию' });
+});
+app.post('/api/gifts/sell', authMiddleware, (req, res) => {
+  ensureGiftAccount(req.user);
+  const instanceId = String((req.body || {}).instanceId || '');
+  const index = req.user.giftCollection.findIndex(g => g.instanceId === instanceId);
+  if (index < 0) return res.status(404).json({ error: 'Подарок не найден в вашей коллекции' });
+  const gift = req.user.giftCollection[index];
+  const now = Date.now();
+  if (!Number.isFinite(gift.sellableUntil) || now > gift.sellableUntil) return res.status(409).json({ error: 'Срок продажи этого подарка (7 дней с получения) истёк' });
+  const amount = Math.floor((Number(gift.purchasePrice) || 0) / 1.5);
+  req.user.giftCollection.splice(index, 1);
+  req.user.nevocoins += amount;
+  req.user.giftHistory.push({ id: nanoid(), emoji: gift.emoji, title: gift.name, date: now, action: 'Продажа подарка', amount: '+◈ ' + amount, giftInstanceId: instanceId });
+  save();
+  res.json({ ...giftAccountResponse(req.user), soldFor: amount });
+});
+app.get('/api/gifts/users', authMiddleware, (req, res) => {
+  const q = String(req.query.q || '').trim().replace(/^@/, '').toLowerCase();
+  if (q.length < 1) return res.json({ users: [] });
+  const users = state.users.filter(u => u.id !== req.user.id && String(u.username || u.email || '').toLowerCase().includes(q))
+    .slice(0, 20).map(u => ({ username: u.username || u.email, name: u.name || u.username || 'Пользователь', avatar: u.avatar || '' }));
+  res.json({ users });
+});
+
 app.put('/api/me/security', authMiddleware, (req, res) => {
   const password = String((req.body || {}).password || '');
   const secretCode = String((req.body || {}).secretCode || '').trim();
