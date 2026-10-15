@@ -215,6 +215,17 @@ app.post('/api/gifts/sell', authMiddleware, (req, res) => {
   save();
   res.json({ ...giftAccountResponse(req.user), soldFor: amount });
 });
+app.post('/api/admin/users/:id/nevocoins', adminMiddleware, (req, res) => {
+  const amount = Number((req.body || {}).amount);
+  if (!Number.isSafeInteger(amount) || amount < 1 || amount > 1000000) return res.status(400).json({ error: 'Количество должно быть целым числом от 1 до 1 000 000' });
+  const user = state.users.find(u => u.id === req.params.id);
+  if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
+  ensureGiftAccount(user);
+  user.nevocoins += amount;
+  user.giftHistory.push({ id: nanoid(), emoji: '◈', title: 'Nevocoins', date: Date.now(), action: 'Начисление баланса', amount: '+◈ ' + amount });
+  save();
+  res.json({ ok: true, balance: user.nevocoins });
+});
 app.get('/api/gifts/users', authMiddleware, (req, res) => {
   const q = String(req.query.q || '').trim().replace(/^@/, '').toLowerCase();
   if (q.length < 1) return res.json({ users: [] });
