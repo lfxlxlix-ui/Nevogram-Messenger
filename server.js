@@ -785,10 +785,10 @@ io.on('connection', (socket) => {
     const clean = String(text || '').trim().slice(0, 4000);
     let safeAttachment = null;
     if (attachment && typeof attachment === 'object') {
-      const name = String(attachment.name || 'file').replace(/[\\/\\\\\\0-\\x1f]/g, '_').slice(0, 160);
+      const name = String(attachment.name || 'file').replace(/[\/\\\\\\0-\\x1f]/g, '_').slice(0, 160);
       const mime = String(attachment.mime || 'application/octet-stream').slice(0, 120);
       const data = String(attachment.data || '');
-      const match = data.match(/^data:([a-zA-Z0-9.+-]+\\/[a-zA-Z0-9.+-]+);base64,([A-Za-z0-9+/=]+)$/);
+      const match = data.match(/^data:([a-zA-Z0-9.+-]+\/[a-zA-Z0-9.+-]+);base64,([A-Za-z0-9+/=]+)$/);
       const allowed = ['image/', 'video/', 'audio/'].some(prefix => mime.startsWith(prefix)) || ['application/pdf','text/plain','application/zip','application/octet-stream'].includes(mime);
       if (!match || match[1] !== mime || data.length > 8 * 1024 * 1024 || !allowed) {
         socket.emit('message:error', { error: 'Файл не поддерживается или слишком большой (максимум 6 МБ).' }); return;
