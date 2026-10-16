@@ -591,7 +591,7 @@
     const file = attachmentInput.files && attachmentInput.files[0];
     attachmentInput.value = '';
     if (!file || !state.activeChat) return;
-    if (file.size > 6 * 1024 * 1024) { alert('Максимальный размер файла — 6 МБ.'); return; }
+    if (file.size > 50 * 1024 * 1024) { alert('Файл слишком большой для отправки через текущий сервер (максимум 50 МБ).'); return; }
     const allowed = /^(image|video|audio)\//.test(file.type) || ['application/pdf','text/plain','application/zip','application/octet-stream'].includes(file.type);
     if (!allowed) { alert('Этот тип файла не поддерживается.'); return; }
     try {
@@ -615,7 +615,7 @@
         const blob = new Blob(recordingChunks, { type: recording.mimeType || 'audio/webm' });
         recording = null; voiceButton.textContent = '🎙️ Голосовое';
         if (!blob.size) return;
-        if (blob.size > 6 * 1024 * 1024) { alert('Голосовое получилось больше 6 МБ. Запишите покороче.'); return; }
+        if (blob.size > 50 * 1024 * 1024) { alert('Голосовое слишком большое для отправки через текущий сервер (максимум 50 МБ).'); return; }
         try {
           const data = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = () => reject(new Error('Не удалось прочитать запись.')); reader.readAsDataURL(blob); });
           const ext = blob.type.includes('mp4') ? 'm4a' : 'webm';
@@ -623,7 +623,6 @@
         } catch (err) { alert(err.message || 'Не удалось отправить голосовое.'); }
       };
       recording.start(); voiceButton.textContent = '⏹️ Остановить запись';
-      setTimeout(() => { if (recording && recording.state === 'recording') { recording.stop(); } }, 120000);
     } catch (err) { alert('Разрешите доступ к микрофону, чтобы записать голосовое.'); recording = null; voiceButton.textContent = '🎙️ Голосовое'; }
   });
 
