@@ -406,6 +406,7 @@ app.get('/api/chats/:id/messages', authMiddleware, (req, res) => {
     senderId: m.senderId,
     senderName: m.senderId === 'nevogram-ai' ? 'Nevogram AI' : ((state.users.find(u => u.id === m.senderId) || {}).name || '???'),
     text: m.text,
+    attachment: m.attachment || null,
     createdAt: m.createdAt,
     read: m.readBy.length > 1 // прочитано кем-то кроме автора
   }));
@@ -785,7 +786,7 @@ io.on('connection', (socket) => {
     const clean = String(text || '').trim().slice(0, 4000);
     let safeAttachment = null;
     if (attachment && typeof attachment === 'object') {
-      const name = String(attachment.name || 'file').replace(/[\/\\\\\\0-\\x1f]/g, '_').slice(0, 160);
+      const name = String(attachment.name || 'file').replace(/[\/\\\x00-\x1f]/g, '_').slice(0, 160);
       const mime = String(attachment.mime || 'application/octet-stream').slice(0, 120);
       const data = String(attachment.data || '');
       const match = data.match(/^data:([a-zA-Z0-9.+-]+\/[a-zA-Z0-9.+-]+);base64,([A-Za-z0-9+/=]+)$/);
