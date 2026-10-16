@@ -13,7 +13,7 @@ const ADMIN_SECRET_CODE = process.env.ADMIN_SECRET_CODE || '';
 const SESSION_SECRET = process.env.SESSION_SECRET || 'nevogram-session-secret-change-in-render-settings';
 
 const app = express();
-app.use(express.json({ limit: '12mb' }));
+app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.get(['/register', '/cananr'], (req, res) => res.sendFile(path.join(__dirname, 'public', 'register.html')));
 app.get('/settings', (req, res) => res.sendFile(path.join(__dirname, 'public', 'settings.html')));
@@ -68,7 +68,7 @@ app.get('/profile/:profileId', (req, res) => {
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin', 'index.html')));
 
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, { maxHttpBufferSize: 10 * 1024 * 1024 });
 
 // ---------- Подпись токенов (без внешних библиотек, на встроенном crypto) ----------
 function sign(payloadObj) {
@@ -773,7 +773,7 @@ io.on('connection', (socket) => {
 
   socket.broadcast.emit('presence', { userId: socket.userId, online: true });
 
-  socket.on('message:send', ({ chatId, text }) => {
+  socket.on('message:send', ({ chatId, text, attachment }) => {
     const chat = state.chats.find(c => c.id === chatId);
     if (!chat || !chat.memberIds.includes(socket.userId)) return;
     const sender = state.users.find(u => u.id === socket.userId);
@@ -783,12 +783,25 @@ io.on('connection', (socket) => {
     }
     if (chat.type === 'channel' && !channelPermission(chat, socket.userId, 'publishMessages')) return;
     const clean = String(text || '').trim().slice(0, 4000);
-    if (!clean) return;
+    let safeAttachment = null;
+    if (attachment && typeof attachment === 'object') {
+      const name = String(attachment.name || 'file').replace(/[\\/\\\\\\0-\\x1f]/g, '_').slice(0, 160);
+      const mime = String(attachment.mime || 'application/octet-stream').slice(0, 120);
+      const data = String(attachment.data || '');
+      const match = data.match(/^data:([a-zA-Z0-9.+-]+\\/[a-zA-Z0-9.+-]+);base64,([A-Za-z0-9+/=]+)$/);
+      const allowed = ['image/', 'video/', 'audio/'].some(prefix => mime.startsWith(prefix)) || ['application/pdf','text/plain','application/zip','application/octet-stream'].includes(mime);
+      if (!match || match[1] !== mime || data.length > 8 * 1024 * 1024 || !allowed) {
+        socket.emit('message:error', { error: 'Файл не поддерживается или слишком большой (максимум 6 МБ).' }); return;
+      }
+      safeAttachment = { name, mime, data, size: Math.floor(match[2].length * 3 / 4) };
+    }
+    if (!clean && !safeAttachment) return;
     const msg = {
       id: nanoid(),
       chatId,
       senderId: socket.userId,
       text: clean,
+      attachment: safeAttachment,
       createdAt: Date.now(),
       readBy: [socket.userId]
     };
