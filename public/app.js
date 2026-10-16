@@ -525,9 +525,22 @@
     const canDelete = isChannel ? (state.activeChat.isOwner || state.activeChat.adminPermissions?.deleteMessages) : mine;
     div.innerHTML = `
       ${!mine && state.activeChat && state.activeChat.type === 'group' ? `<div class="sender">${escapeHtml(msg.senderName)}</div>` : ''}
-      <div class="text">${escapeHtml(msg.text)}</div>
+      <div class="text">${escapeHtml(msg.text || '')}</div>
+      <div class="attachment-content"></div>
       <div class="meta">${formatTime(msg.createdAt)}${msg.editedAt ? ' · изменено' : ''}${mine ? ' ✓' : ''}</div>
       ${(canEdit || canDelete) ? '<div class="message-actions"></div>' : ''}`;
+    if (msg.attachment && /^data:(image|video|audio)\\//.test(msg.attachment.data || '')) {
+      const wrap = div.querySelector('.attachment-content');
+      const mime = String(msg.attachment.mime || '');
+      let media;
+      if (mime.startsWith('image/')) { media = document.createElement('img'); media.className = 'chat-attachment-image'; media.alt = msg.attachment.name || 'Фото'; media.loading = 'lazy'; media.src = msg.attachment.data; }
+      else if (mime.startsWith('video/')) { media = document.createElement('video'); media.className = 'chat-attachment-media'; media.controls = true; media.preload = 'metadata'; media.src = msg.attachment.data; }
+      else { media = document.createElement('audio'); media.className = 'chat-attachment-audio'; media.controls = true; media.preload = 'metadata'; media.src = msg.attachment.data; }
+      wrap.appendChild(media);
+      if (msg.attachment.name) { const label = document.createElement('div'); label.className = 'attachment-name'; label.textContent = msg.attachment.name; wrap.appendChild(label); }
+    } else if (msg.attachment && msg.attachment.data) {
+      const link = document.createElement('a'); link.className = 'chat-attachment-file'; link.href = msg.attachment.data; link.download = msg.attachment.name || 'file'; link.textContent = '📎 ' + (msg.attachment.name || 'Скачать файл'); div.querySelector('.attachment-content').appendChild(link);
+    }
     const actions = div.querySelector('.message-actions');
     if (actions) {
       if (canEdit) {
@@ -551,15 +564,67 @@
     box.scrollTop = box.scrollHeight;
   }
 
+  async function sendChatPayload(payload) {
+    if (!state.activeChat || !state.socket) return;
+    if (state.activeChat.type === 'channel' && !state.activeChat.canPost) { alert('У вас нет права отправлять сообщения в этом канале.'); return; }
+    state.socket.emit('message:send', { chatId: state.activeChat.id, ...payload });
+  }
   el('sendForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const input = el('messageInput');
     const text = input.value.trim();
-    if (!text) return;
-    if (!state.activeChat) return;
-    if (state.activeChat.type === 'channel' && !state.activeChat.canPost) return;
-    state.socket.emit('message:send', { chatId: state.activeChat.id, text });
+    if (!text || !state.activeChat) return;
+    await sendChatPayload({ text });
     input.value = '';
+  });
+
+  const attachmentInput = document.getElementById('attachmentInput');
+  const attachmentButton = document.getElementById('attachmentButton');
+  const voiceButton = document.getElementById('voiceMessageButton');
+  let recording = null, recordingChunks = [];
+  attachmentButton?.addEventListener('click', () => {
+    if (!state.activeChat) { alert('Сначала откройте чат.'); return; }
+    if (state.activeChat.type === 'channel' && !state.activeChat.canPost) { alert('У вас нет права отправлять сообщения в этом канале.'); return; }
+    attachmentInput.click();
+  });
+  attachmentInput?.addEventListener('change', async () => {
+    const file = attachmentInput.files && attachmentInput.files[0];
+    attachmentInput.value = '';
+    if (!file || !state.activeChat) return;
+    if (file.size > 6 * 1024 * 1024) { alert('Максимальный размер файла — 6 МБ.'); return; }
+    const allowed = /^(image|video|audio)\\//.test(file.type) || ['application/pdf','text/plain','application/zip','application/octet-stream'].includes(file.type);
+    if (!allowed) { alert('Этот тип файла не поддерживается.'); return; }
+    try {
+      const data = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = () => reject(new Error('Не удалось прочитать файл.')); reader.readAsDataURL(file); });
+      await sendChatPayload({ text: '', attachment: { name: file.name, mime: file.type || 'application/octet-stream', data } });
+    } catch (err) { alert(err.message || 'Не удалось отправить файл.'); }
+  });
+  voiceButton?.addEventListener('click', async () => {
+    if (recording) { recording.stop(); voiceButton.textContent = '🎙️ Голосовое'; return; }
+    if (!state.activeChat) { alert('Сначала откройте чат.'); return; }
+    if (state.activeChat.type === 'channel' && !state.activeChat.canPost) { alert('У вас нет права отправлять сообщения в этом канале.'); return; }
+    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) { alert('Запись голосовых не поддерживается этим браузером.'); return; }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = ['audio/webm;codecs=opus','audio/webm','audio/mp4'].find(type => MediaRecorder.isTypeSupported(type)) || '';
+      recording = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      recordingChunks = [];
+      recording.ondataavailable = event => { if (event.data.size) recordingChunks.push(event.data); };
+      recording.onstop = async () => {
+        stream.getTracks().forEach(track => track.stop());
+        const blob = new Blob(recordingChunks, { type: recording.mimeType || 'audio/webm' });
+        recording = null; voiceButton.textContent = '🎙️ Голосовое';
+        if (!blob.size) return;
+        if (blob.size > 6 * 1024 * 1024) { alert('Голосовое получилось больше 6 МБ. Запишите покороче.'); return; }
+        try {
+          const data = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = () => reject(new Error('Не удалось прочитать запись.')); reader.readAsDataURL(blob); });
+          const ext = blob.type.includes('mp4') ? 'm4a' : 'webm';
+          await sendChatPayload({ text: '', attachment: { name: 'Голосовое.' + ext, mime: blob.type || 'audio/webm', data } });
+        } catch (err) { alert(err.message || 'Не удалось отправить голосовое.'); }
+      };
+      recording.start(); voiceButton.textContent = '⏹️ Остановить запись';
+      setTimeout(() => { if (recording && recording.state === 'recording') { recording.stop(); } }, 120000);
+    } catch (err) { alert('Разрешите доступ к микрофону, чтобы записать голосовое.'); recording = null; voiceButton.textContent = '🎙️ Голосовое'; }
   });
 
   let typingTimer = null;
