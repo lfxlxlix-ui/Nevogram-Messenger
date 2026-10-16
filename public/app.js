@@ -529,7 +529,7 @@
       <div class="attachment-content"></div>
       <div class="meta">${formatTime(msg.createdAt)}${msg.editedAt ? ' · изменено' : ''}${mine ? ' ✓' : ''}</div>
       ${(canEdit || canDelete) ? '<div class="message-actions"></div>' : ''}`;
-    if (msg.attachment && /^data:(image|video|audio)\\//.test(msg.attachment.data || '')) {
+    if (msg.attachment && /^data:(image|video|audio)\//.test(msg.attachment.data || '')) {
       const wrap = div.querySelector('.attachment-content');
       const mime = String(msg.attachment.mime || '');
       let media;
@@ -592,7 +592,7 @@
     attachmentInput.value = '';
     if (!file || !state.activeChat) return;
     if (file.size > 6 * 1024 * 1024) { alert('Максимальный размер файла — 6 МБ.'); return; }
-    const allowed = /^(image|video|audio)\\//.test(file.type) || ['application/pdf','text/plain','application/zip','application/octet-stream'].includes(file.type);
+    const allowed = /^(image|video|audio)\//.test(file.type) || ['application/pdf','text/plain','application/zip','application/octet-stream'].includes(file.type);
     if (!allowed) { alert('Этот тип файла не поддерживается.'); return; }
     try {
       const data = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = () => reject(new Error('Не удалось прочитать файл.')); reader.readAsDataURL(file); });
