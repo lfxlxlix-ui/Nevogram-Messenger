@@ -55,9 +55,8 @@
         </div>
         <div id="channelActionBar" class="channel-action-bar hidden"><button id="channelAdminsOpenBtn" type="button">⚙️ Управление каналом</button><button id="channelInviteBtn" type="button">🔗 Ссылка-приглашение</button><button id="channelLeaveBtn" type="button">Отписаться</button><button id="voiceStartBtn" type="button">🎙️ Начать голосовой чат</button><button id="voiceJoinBtn" type="button" class="hidden">🎧 Присоединиться</button><button id="voiceLeaveBtn" type="button" class="hidden">Отключиться</button><span id="voiceStatus" aria-live="polite"></span><div id="voiceAudios" class="voice-audios"></div></div><div id="messages" class="messages"></div>
         <form id="sendForm" class="send-form">
-          <button id="attachmentButton" type="button" class="attachment-button" title="Фото, видео, музыка или файл" aria-label="Прикрепить файл">📎</button>
-          <input id="attachmentInput" type="file" accept="image/*,video/*,audio/*,.pdf,.txt,.zip" hidden>
-          <button id="voiceMessageButton" type="button" class="attachment-button" title="Записать голосовое" aria-label="Записать голосовое">🎙️ Голосовое</button>
+          <button id="attachmentButton" type="button" class="attachment-button" title="Фото или видео до 30 МБ" aria-label="Прикрепить фото или видео">📎</button>
+          <input id="attachmentInput" type="file" accept="image/*,video/*" hidden>
           <input id="messageInput" type="text" placeholder="Сообщение" autocomplete="off">
           <button type="submit">➤</button>
         </form>
