@@ -13,7 +13,7 @@ const ADMIN_SECRET_CODE = process.env.ADMIN_SECRET_CODE || '';
 const SESSION_SECRET = process.env.SESSION_SECRET || 'nevogram-session-secret-change-in-render-settings';
 
 const app = express();
-app.use(express.json({ limit: '70mb' }));
+app.use(express.json({ limit: '42mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.get(['/register', '/cananr'], (req, res) => res.sendFile(path.join(__dirname, 'public', 'register.html')));
 app.get('/settings', (req, res) => res.sendFile(path.join(__dirname, 'public', 'settings.html')));
@@ -68,7 +68,7 @@ app.get('/profile/:profileId', (req, res) => {
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin', 'index.html')));
 
 const server = http.createServer(app);
-const io = new Server(server, { maxHttpBufferSize: 70 * 1024 * 1024 });
+const io = new Server(server, { maxHttpBufferSize: 42 * 1024 * 1024 });
 
 // ---------- Подпись токенов (без внешних библиотек, на встроенном crypto) ----------
 function sign(payloadObj) {
@@ -790,9 +790,9 @@ io.on('connection', (socket) => {
       const mime = String(attachment.mime || 'application/octet-stream').slice(0, 120);
       const data = String(attachment.data || '');
       const match = data.match(/^data:([a-zA-Z0-9.+-]+\/[a-zA-Z0-9.+-]+);base64,([A-Za-z0-9+/=]+)$/);
-      const allowed = ['image/', 'video/', 'audio/'].some(prefix => mime.startsWith(prefix)) || ['application/pdf','text/plain','application/zip','application/octet-stream'].includes(mime);
-      if (!match || match[1] !== mime || data.length > 68 * 1024 * 1024 || !allowed) {
-        socket.emit('message:error', { error: 'Файл не поддерживается или слишком большой (максимум 6 МБ).' }); return;
+      const allowed = /^image\/(jpeg|png|gif|webp|avif|heic|heif|bmp)$/.test(mime) || /^video\/(mp4|webm|quicktime|x-matroska|3gpp|x-msvideo|mpeg|ogg)$/.test(mime);
+      if (!match || match[1] !== mime || !allowed || Math.floor(match[2].length * 3 / 4) > 30 * 1024 * 1024) {
+        socket.emit('message:error', { error: 'Можно отправлять только фото и видео размером до 30 МБ.' }); return;
       }
       safeAttachment = { name, mime, data, size: Math.floor(match[2].length * 3 / 4) };
     }
