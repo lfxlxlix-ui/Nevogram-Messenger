@@ -591,9 +591,9 @@
     const file = attachmentInput.files && attachmentInput.files[0];
     attachmentInput.value = '';
     if (!file || !state.activeChat) return;
-    if (file.size > 50 * 1024 * 1024) { alert('Файл слишком большой для отправки через текущий сервер (максимум 50 МБ).'); return; }
-    const allowed = /^(image|video|audio)\//.test(file.type) || ['application/pdf','text/plain','application/zip','application/octet-stream'].includes(file.type);
-    if (!allowed) { alert('Этот тип файла не поддерживается.'); return; }
+    if (file.size > 30 * 1024 * 1024) { alert('Фото или видео должно быть не больше 30 МБ.'); return; }
+    const allowed = /^image\/(jpeg|png|gif|webp|avif|heic|heif|bmp)$/.test(file.type) || /^video\/(mp4|webm|quicktime|x-matroska|3gpp|x-msvideo|mpeg|ogg)$/.test(file.type);
+    if (!allowed) { alert('Можно отправлять только фото и видео.'); return; }
     try {
       const data = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = () => reject(new Error('Не удалось прочитать файл.')); reader.readAsDataURL(file); });
       await sendChatPayload({ text: '', attachment: { name: file.name, mime: file.type || 'application/octet-stream', data } });
