@@ -5,6 +5,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,6 +42,9 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.delay
+import io.socket.client.IO
+import io.socket.client.Socket
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
@@ -66,6 +71,10 @@ private fun NevogramApp() {
     var error by remember { mutableStateOf("") }
     var loading by remember { mutableStateOf(false) }
     var chats by remember { mutableStateOf<List<ChatItem>>(emptyList()) }
+    var selectedChat by remember { mutableStateOf<ChatItem?>(null) }
+    var messages by remember { mutableStateOf<List<MessageItem>>(emptyList()) }
+    var draft by remember { mutableStateOf("") }
+    var socket by remember { mutableStateOf<Socket?>(null) }
 
     MaterialTheme {
         Surface(Modifier.fillMaxSize(), color = Night) {
@@ -120,6 +129,51 @@ private fun NevogramApp() {
                     Spacer(Modifier.height(10.dp))
                     Text("Вход использует существующий аккаунт Nevogram.", color = Muted, fontSize = 12.sp)
                 }
+            } else if (selectedChat != null) {
+                val activeToken = token!!
+                val activeChat = selectedChat!!
+                LaunchedEffect(activeChat.id, activeToken) {
+                    val conn = IO.socket(API, IO.Options.builder().setAuth(mapOf("token" to activeToken)).build())
+                    socket = conn
+                    conn.connect()
+                    while (true) {
+                        val result = withContext(Dispatchers.IO) { apiGet("/api/chats/${activeChat.id}/messages", activeToken) }
+                        val arr = result.optJSONArray("messages")
+                        messages = arr?.let { list ->
+                            (0 until list.length()).map { i ->
+                                val msg = list.getJSONObject(i)
+                                MessageItem(msg.optString("id"), msg.optString("senderName", "Пользователь"), msg.optString("senderId"), msg.optString("text"), msg.optLong("createdAt"))
+                            }
+                        }.orEmpty()
+                        delay(3000)
+                    }
+                }
+                Column(Modifier.fillMaxSize().padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        TextButton(onClick = { socket?.disconnect(); socket = null; selectedChat = null; messages = emptyList() }) { Text("‹ Назад", color = Accent) }
+                        Text(activeChat.title, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    LazyColumn(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(messages) { msg ->
+                            Column(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+                                Text(msg.senderName, color = Muted, fontSize = 11.sp)
+                                Text(msg.text.ifBlank { "Вложение" }, color = Color.White, modifier = Modifier.background(Panel, RoundedCornerShape(14.dp)).padding(12.dp))
+                            }
+                        }
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedTextField(value = draft, onValueChange = { draft = it }, modifier = Modifier.weight(1f), label = { Text("Сообщение") }, maxLines = 4)
+                        Spacer(Modifier.width(8.dp))
+                        Button(onClick = {
+                            val outgoing = draft.trim()
+                            if (outgoing.isNotEmpty()) {
+                                socket?.emit("message:send", JSONObject().put("chatId", activeChat.id).put("text", outgoing))
+                                draft = ""
+                            }
+                        }, colors = ButtonDefaults.buttonColors(containerColor = Accent)) { Text("➤") }
+                    }
+                }
             } else {
                 LaunchedEffect(token) {
                     loading = true
@@ -129,7 +183,7 @@ private fun NevogramApp() {
                             val item = arr.getJSONObject(i)
                             ChatItem(
                                 id = item.optString("id"),
-                                title = item.optString("name").ifBlank { item.optString("title").ifBlank { "Чат" } },
+                                title = item.optString("title").ifBlank { item.optString("name").ifBlank { "Чат" } },
                                 preview = item.optJSONObject("lastMessage")?.optString("text").orEmpty()
                             )
                         }
@@ -155,7 +209,7 @@ private fun NevogramApp() {
                         else -> chats.forEach { chat ->
                             Row(
                                 Modifier.fillMaxWidth().padding(vertical = 5.dp)
-                                    .background(Panel, RoundedCornerShape(18.dp)).padding(14.dp),
+                                    .background(Panel, RoundedCornerShape(18.dp)).clickable { selectedChat = chat }.padding(14.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Box(Modifier.size(46.dp).background(
@@ -179,6 +233,7 @@ private fun NevogramApp() {
 }
 
 private data class ChatItem(val id: String, val title: String, val preview: String)
+private data class MessageItem(val id: String, val senderName: String, val senderId: String, val text: String, val createdAt: Long)
 
 @Composable
 private fun LogoMark(modifier: Modifier = Modifier) {
